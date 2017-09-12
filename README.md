@@ -1,9 +1,7 @@
 # cppiso8601
-Parsing a subset of cppiso8601 datetimes, dates and times in C++
+Parsing a subset of iso8601 datetimes, dates and times in C++
 
-Only a subset of ISO 8601 is implemented.
-
-Only datetimes, dates or times are handled. Timezone is supported.
+Only a subset of ISO 8601 is implemented: certain datetimes, dates or times are handled. Timezone is supported.
 Output tm struct is in UTC.
 
 No week formats. No "representation with reduced accuracy".
