@@ -4,9 +4,15 @@
 #include <vector>
 #include <string>
 
-bool ParseIso8601Date(const char *str, struct tm &tmout);
-bool ParseIso8601Time(const char *str, struct tm &tmout);
-bool ParseIso8601Datetime(const char *str, struct tm &tmout);
+//Not thread safe if normalize is true!
+bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize = true);
+
+//Not thread safe if normalize is true!
+bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize = true);
+
+//Not thread safe if normalize is true!
+bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize = true);
+
 void Iso8601TestCases(std::vector<std::string> &testStrs);
 
 #endif //_ISO8601_H

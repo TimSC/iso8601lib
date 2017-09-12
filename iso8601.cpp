@@ -8,7 +8,7 @@
 #include "iso8601.h"
 using namespace std;
 
-bool ParseIso8601Date(const char *str, struct tm &tmout)
+bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 {
 	int y=1900,M=1,d=1;
 	char excess[101];
@@ -97,6 +97,15 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 	}
 
 	//cout << str << "," << bestScore << "," << bestFmt << endl;
+
+	if(normalize)
+	{
+		//Normalize format
+		time_t ts = mktime (&tmout);
+		struct tm *tmp = gmtime(&ts);
+		memcpy(&tmout, tmp, sizeof(struct tm));
+	}
+
 	return bestScore >= 99;
 }
 
@@ -127,6 +136,9 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 			m = mv;
 	}
 
+	if(ret == 0 && ret2 == 0)
+		return false;
+
 	if(sign == '-')
 		h = -h;
 	if(h < 0)
@@ -134,7 +146,7 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 	return true;
 }
 
-bool ParseIso8601Time(const char *str, struct tm &tmout)
+bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 {
 	int h=0,h2=0,m=0,si=0,si2=0;
 	long long m2=0;
@@ -164,7 +176,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout)
 	if(firstTzChar != NULL)
 	{
 		string tzStr(firstTzChar);
-		ParseIso8601Timezone(tzStr.c_str(), tzh, tzm);
+		bool ok = ParseIso8601Timezone(tzStr.c_str(), tzh, tzm);
+		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
 	}
 
@@ -249,16 +262,25 @@ bool ParseIso8601Time(const char *str, struct tm &tmout)
 	tmout.tm_hour -= tzh;
 	tmout.tm_min -= tzm;
 
+	if(normalize)
+	{
+		//Normalize format
+		time_t ts = mktime (&tmout);
+		struct tm *tmp = gmtime(&ts);
+		memcpy(&tmout, tmp, sizeof(struct tm));
+	}
+
 	return bestScore >= 50;
 }
 
-bool ParseIso8601Datetime(const char *str, struct tm &tmout)
+bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
 {
 	//cout << str << endl;
 	memset(&tmout,0x00,sizeof(tmout));
 	tmout.tm_isdst = -1;
 
 	const char *tChar = strchr (str, 'T');	
+	bool ok = true;
 	if(tChar != NULL)
 	{
 		int dateLen = tChar - str;
@@ -269,13 +291,26 @@ bool ParseIso8601Datetime(const char *str, struct tm &tmout)
 		
 		//cout << dateStr << "," << timeStr << endl;
 
-		ParseIso8601Date(dateStr.c_str(), tmout);
-		ParseIso8601Time(timeStr.c_str(), tmout);
+		ok = ParseIso8601Date(dateStr.c_str(), tmout, false);
+		if(!ok) return false;
+		ok = ParseIso8601Time(timeStr.c_str(), tmout, false);
+		if(!ok) return false;
 	}
 	else
-		ParseIso8601Date(str, tmout); //Only the date is specified
+	{
+		ok = ParseIso8601Date(str, tmout, false); //Only the date is specified
+		if(!ok) return false;
+	}
 
-	return true;
+	if(normalize)
+	{
+		//Normalize format
+		time_t ts = mktime (&tmout);
+		struct tm *tmp = gmtime(&ts);
+		memcpy(&tmout, tmp, sizeof(struct tm));
+	}
+
+	return ok;
 }
 
 void Iso8601TestCases(std::vector<std::string> &testStrs)
@@ -304,7 +339,7 @@ void Iso8601TestCases(std::vector<std::string> &testStrs)
 	testStrs.push_back("2010-02-18T16.23334444");
 
 	//Long number after remainder? Not really supported (yet)
-	testStrs.push_back("2010-02-18T16.2233344445555");
-	testStrs.push_back("2010-02-18T16.22333444455555666666");
+	//testStrs.push_back("2010-02-18T16.2233344445555");
+	//testStrs.push_back("2010-02-18T16.22333444455555666666");
 }
 
