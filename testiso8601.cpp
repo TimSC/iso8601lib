@@ -66,10 +66,10 @@ void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<double> &t
 	testTimestamps.push_back(1266509640);
 
 	testStrs.push_back("2010-02-18T16.2233344445555");
-	testTimestamps.push_back(1266509580);
+	testTimestamps.push_back(1266509604.0040004);
 
 	testStrs.push_back("2010-02-18T16.22333444455555666666");
-	testTimestamps.push_back(1266509580);
+	testTimestamps.push_back(1266509604.0040004);
 }
 
 int main()
@@ -94,7 +94,7 @@ int main()
 		cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," << dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << endl;
 
 		cout << ctime(&ts);// UTC date+time string
-		cout << (int64_t)ts << "=" << testTimestamps[i]; //UTC unix time-stamp
+		cout << (int64_t)ts << "=" << (int64_t)round(testTimestamps[i]); //UTC unix time-stamp
 		if(fabs((int64_t)ts - round(testTimestamps[i]))>1e-6) cout << " FAIL";
 		cout << endl;
 	}

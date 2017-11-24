@@ -213,15 +213,18 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 4 hours and minutes, with no dashes
-	h = 0; mf = 0.0f;
-	int ret5 = sscanf(baseTime.c_str(), "%2d%f%s", &h, &mf, excess);
-	if(ret5 == 2 && h >= 0 && mf >= 0.0f)
+	if(baseTime.size() > 2 && baseTime[2] != '.')
 	{
-		tmout.tm_hour = h;
-		tmout.tm_min = int(mf);
-		tmout.tm_sec = round((mf - tmout.tm_min)*60.0);
-		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
-		return true;
+		h = 0; mf = 0.0f;
+		int ret5 = sscanf(baseTime.c_str(), "%2d%f%s", &h, &mf, excess);
+		if(ret5 == 2 && h >= 0 && mf >= 0.0f)
+		{
+			tmout.tm_hour = h;
+			tmout.tm_min = int(mf);
+			tmout.tm_sec = round((mf - tmout.tm_min)*60.0);
+			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			return true;
+		}
 	}
 
 	//Format 5 hours
@@ -230,7 +233,7 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	if(ret3 == 1 && h >= 0 && h2 >= 0)
 	{
 		tmout.tm_hour = int(hf);
-		float mins = (hf - tmout.tm_hour) * 60.0f;
+		float mins = (hf - (float)tmout.tm_hour) * 60.0f;
 		tmout.tm_min = (int)mins;
 		tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
 		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
