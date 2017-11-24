@@ -5,8 +5,24 @@
 #include <cstring>
 #include <string>
 #include <sstream>
+#include <cmath>
 #include "iso8601.h"
 using namespace std;
+
+void ApplyTimezoneNormalize(struct tm &tmout, bool normalize, int tzh, int tzm)
+{
+	//Apply timezone to get UTC
+	tmout.tm_hour -= tzh;
+	tmout.tm_min -= tzm;
+
+	if(normalize)
+	{
+		//Normalize format
+		time_t ts = mktime (&tmout);
+		struct tm *tmp = gmtime(&ts);
+		memcpy(&tmout, tmp, sizeof(struct tm));
+	}
+}
 
 bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 {
@@ -18,95 +34,76 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 
 	//Format 1 conventional date with dashes
 	int ret = sscanf(str, "%4d-%2d-%2d%100s", &y, &M, &d, excess);
-	int score1 = ret * 33;
-	if(ret >= 4 || y < 0 || M < 0 || d < 0) score1 = 0;
-	tmout.tm_year = y - 1900;
-	tmout.tm_mon = M - 1;
-	tmout.tm_mday = d;
-	int bestScore = score1;
-	string bestFmt = "conventional";
-	
+	if(ret == 3 && y >= 0 && M >= 0 && d >= 0)
+	{
+		tmout.tm_year = y - 1900;
+		tmout.tm_mon = M - 1;
+		tmout.tm_mday = d;
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
+	}
+
 	//Format 2 plus signed year
 	y = 1900;
 	int ret2 = sscanf(str, "+%4d%100s", &y, excess);
-	int score2 = ret2 * 100;
-	if(ret2 >= 2 || y < 0) score2 = 0;
-	if(score2 > bestScore)
+	if(ret2 == 1 && y >= 0)
 	{
 		tmout.tm_year = y - 1900;
 		tmout.tm_mon = 0;
 		tmout.tm_mday = 1;
-		bestScore = score2;
-		bestFmt = "signed (+) year";
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
 	}
 
 	//Format 2b minus signed year
 	y = 100;
 	int ret2b = sscanf(str, "-%4d%100s", &y, excess);
-	int score2b = ret2b * 100;
-	if(ret2b >= 2 || y < 0) score2b = 0;
-	if(score2b > bestScore)
+	if(ret2b == 1 && y >= 0)
 	{
 		tmout.tm_year = - y - 1900;
 		tmout.tm_mon = 0;
 		tmout.tm_mday = 1;
-		bestScore = score2b;
-		bestFmt = "signed (-) year";
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
 	}
 
 	//Format 3 plain year
 	y = 1900;
 	int ret3 = sscanf(str, "%4d%100s", &y, excess);
-	int score3 = ret3 * 100;
-	if(ret3 >= 2 || y < 0) score3 = 0;
-	if(score3 > bestScore)
+	if(ret3 == 1 && y >= 0)
 	{
 		tmout.tm_year = y - 1900;
 		tmout.tm_mon = 0;
 		tmout.tm_mday = 1;
-		bestScore = score3;
-		bestFmt = "plain year";
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
 	}
 
 	//Format 4 full date with no dashes
 	y = 1900; M = 1; d = 1;
 	int ret4 = sscanf(str, "%4d%2d%2d%100s", &y, &M, &d, excess);
-	int score4 = ret4 * 33;
-	if(ret4 >= 4 || y < 0 || M < 0 || d < 0) score4 = 0;
-	if(score4 > bestScore)
+	if(ret4 == 3 && y >= 0 && M >= 0 && d >= 0)
 	{
 		tmout.tm_year = y - 1900;
 		tmout.tm_mon = M - 1;
 		tmout.tm_mday = d;
-		bestScore = score4;
-		bestFmt = "full date, no dashes";
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
 	}
 
 	//Format 5 plain year and month
 	y = 1900; M = 1;
 	int ret5 = sscanf(str, "%4d-%2d%100s", &y, &M, excess);
-	int score5 = ret5 * 50;
-	if(ret5 >= 3 || y < 0 || M < 0) score5 = 0;
-	if(score5 > bestScore)
+	if(ret5 == 2 && y >= 0 && M >= 0)
 	{
 		tmout.tm_year = y - 1900;
 		tmout.tm_mon = M - 1;
 		tmout.tm_mday = 1;
-		bestScore = score5;
-		bestFmt = "plain year and month";
+		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+		return true;
 	}
 
-	//cout << str << "," << bestScore << "," << bestFmt << endl;
-
-	if(normalize)
-	{
-		//Normalize format
-		time_t ts = mktime (&tmout);
-		struct tm *tmp = gmtime(&ts);
-		memcpy(&tmout, tmp, sizeof(struct tm));
-	}
-
-	return bestScore >= 99;
+	return false;
 }
 
 bool ParseIso8601Timezone(const char *str, int &h, int &m)
@@ -148,9 +145,8 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 
 bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 {
-	int h=0,h2=0,m=0,si=0,si2=0;
-	long long m2=0;
-	float s=0.0f, mf=0.0f;
+	int h=0,h2=0,m=0,si=0;
+	float s=0.0f, mf=0.0f, hf=0.0f;
 	char excess[101];
 
 	const char *zChar = strchr (str, 'Z');	
@@ -180,97 +176,68 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
 	}
-
-	//A better idea would be to put the shorter formats first, so they can be replaced by 
-	//more complete representations.
 	
 	//Format 1 full time
 	int ret = sscanf(baseTime.c_str(), "%2d:%2d:%f%100s", &h, &m, &s, excess);
-	int score1 = ret * 33;
-	if(ret >= 4 || h < 0 || m < 0 || s < 0.0f) score1 = 0;
-	tmout.tm_hour = h;
-	tmout.tm_min = m;
-	tmout.tm_sec = (int)s;
-	int bestScore = score1;
-	string bestFmt = "conventional";
+	if(ret == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+	{
+		tmout.tm_hour = h;
+		tmout.tm_min = m;
+		tmout.tm_sec = round(s);
+		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+		return true;
+	}
 
 	//Format 2 hours and minutes
 	h = 0; mf = 0.0f;
 	int ret2 = sscanf(baseTime.c_str(), "%2d:%f%100s", &h, &mf, excess);
-	int score2 = ret2 * 50;
-	if(ret2 >= 3 || h < 0 || mf < 0) score2 = 0;
-	if(score2 > bestScore)
+	if(ret2 == 2 && h >= 0 && mf >= 0)
 	{
 		tmout.tm_hour = h;
 		tmout.tm_min = mf;
-		tmout.tm_sec = (mf - int(mf)) * 60.0;
-		bestScore = score2;
-		bestFmt = "hours and minutes";
+		tmout.tm_sec = round((mf - int(mf)) * 60.0);
+		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+		return true;
 	}
 
 	//Format 3 hours
-	h = 0; h2 = 0;
-	int ret3 = sscanf(baseTime.c_str(), "%2d.%d%100s", &h, &h2, excess);
-	int score3 = ret3 * 50;
-	if(ret3 >= 3 || h < 0 || h2 < 0) score3 = 0;
-	if(score3 > bestScore)
+	hf = 0.0f;
+	int ret3 = sscanf(baseTime.c_str(), "%f%100s", &hf, excess);
+	if(ret3 == 2 && h >= 0 && h2 >= 0)
 	{
-		tmout.tm_hour = h;
-		stringstream ss;
-		ss << "0." << h2;
-		float mins = atof(ss.str().c_str()) * 60.0f;
+		tmout.tm_hour = int(hf);
+		float mins = (hf - tmout.tm_hour) * 60.0f;
 		tmout.tm_min = (int)mins;
-		tmout.tm_sec = (mins - (float)tmout.tm_min) * 60.0f;
-
-		bestScore = score3;
-		bestFmt = "hours";
+		tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
+		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+		return true;
 	}
 
 	//Format 4 full time with no dashes
-	h = 0; m = 0; si = 0; si2 = 0;
-	int ret4 = sscanf(baseTime.c_str(), "%2d%2d%2d.%d%s", &h, &m, &si, &si2, excess);
-	int score4 = ret4 * 25;
-	if(ret4 >= 5 || h < 0 || m < 0 || si < 0 || si2 < 0) score4 = 0;
-	if(score4 > bestScore)
+	h = 0; m = 0; s = 0.0f;
+	int ret4 = sscanf(baseTime.c_str(), "%2d%2d%f%s", &h, &m, &s, excess);
+	if(ret4 == 3 && h >= 0 && m >= 0 && s >= 0.0f)
 	{
 		tmout.tm_hour = h;
 		tmout.tm_min = m;
-		tmout.tm_sec = si;
-		bestScore = score4;
-		bestFmt = "no dashes";
+		tmout.tm_sec = round(si);
+		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+		return true;
 	}
 
 	//Format 5 hours and minutes, with no dashes
-	h = 0; m = 0; m2 = 0;
-	int ret5 = sscanf(baseTime.c_str(), "%2d%2d.%lld%s", &h, &m, &m2, excess);
-	int score5 = ret5 * 33;
-	if(ret5 >= 4 || h < 0 || m < 0 || m2 < 0) score5 = 0;
-	if(score5 > bestScore)
+	h = 0; mf = 0.0f;
+	int ret5 = sscanf(baseTime.c_str(), "%2d%f%s", &h, &mf, excess);
+	if(ret5 == 2 && h >= 0 && mf >= 0.0f)
 	{
 		tmout.tm_hour = h;
-		tmout.tm_min = m;
-		stringstream ss;
-		ss << "0." << m2;
-		tmout.tm_sec = (int)(atof(ss.str().c_str()) * 60.0f);
-		bestScore = score5;
-		bestFmt = "hours and minutes, with no dashes";
+		tmout.tm_min = int(mf);
+		tmout.tm_sec = round((mf - tmout.tm_min)*60.0);
+		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+		return true;
 	}
 
-	//cout << "baseTime '" << baseTime << "'," << bestScore << "," << bestFmt << endl;
-		
-	//Apply timezone to get UTC
-	tmout.tm_hour -= tzh;
-	tmout.tm_min -= tzm;
-
-	if(normalize)
-	{
-		//Normalize format
-		time_t ts = mktime (&tmout);
-		struct tm *tmp = gmtime(&ts);
-		memcpy(&tmout, tmp, sizeof(struct tm));
-	}
-
-	return bestScore >= 50;
+	return false;
 }
 
 bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
