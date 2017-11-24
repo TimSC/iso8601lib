@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <stdint.h>
 
 //Not thread safe if normalize is true!
 bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize = true);
@@ -13,7 +14,7 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize = true);
 //Not thread safe if normalize is true!
 bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize = true);
 
-void Iso8601TestCases(std::vector<std::string> &testStrs);
+void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<int64_t> &testTimestamps);
 
 #endif //_ISO8601_H
 
