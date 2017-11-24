@@ -91,7 +91,7 @@ int main()
 
 		time_t ts = mktime (&dt);
 		cout << "Test case: " << testStrs[i] << endl;
-		cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," << dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << endl;
+		//cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," << dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << endl;
 
 		cout << ctime(&ts);// UTC date+time string
 		cout << (int64_t)ts << "=" << (int64_t)round(testTimestamps[i]); //UTC unix time-stamp
