@@ -1,10 +1,11 @@
 #include "iso8601.h"
 #include <iostream>
 #include <time.h>
+#include <cmath>
 #include <assert.h>
 using namespace std;
 
-void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<int64_t> &testTimestamps)
+void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<double> &testTimestamps)
 {
 	testStrs.clear();
 	testTimestamps.clear();
@@ -74,7 +75,7 @@ void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<int64_t> &
 int main()
 {
 	std::vector<std::string> testStrs;
-	std::vector<int64_t> testTimestamps;
+	std::vector<double> testTimestamps;
 	Iso8601TestCases(testStrs, testTimestamps);
 	assert(testStrs.size() == testTimestamps.size());
 	
@@ -94,7 +95,7 @@ int main()
 
 		cout << ctime(&ts);// UTC date+time string
 		cout << (int64_t)ts << "=" << testTimestamps[i]; //UTC unix time-stamp
-		if((int64_t)ts != testTimestamps[i]) cout << " FAIL";
+		if(fabs((int64_t)ts - round(testTimestamps[i]))>1e-6) cout << " FAIL";
 		cout << endl;
 	}
 }
