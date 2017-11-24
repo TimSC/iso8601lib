@@ -42,7 +42,7 @@ void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<double> &t
 	testStrs.push_back("2009-05");
 	testTimestamps.push_back(1241136000);
 
-	testStrs.push_back("2009-05-19T14:39Z"); // datetime.datetime(2009, 5, 19, 14, 39)
+	testStrs.push_back("2009-05-19T14:39Z");
 	testTimestamps.push_back(1242743940);
 
 	testStrs.push_back("20090621T0545Z");

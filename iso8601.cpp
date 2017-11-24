@@ -62,7 +62,7 @@ bool MatchPattern2(const char *str, const char *pattern)
 		}
 		return false;
 	}
-	if(sc != sl) //All characters must match pattern
+	if(sc != sl || pc != pl) //All characters must match pattern
 		return false; 
 
 	return true;
