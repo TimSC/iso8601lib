@@ -74,6 +74,79 @@ void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<double> &t
 
 	testStrs.push_back("2010-02-18T16.22333444455555666666");
 	testTimestamps.push_back(1266509604.0040004);
+
+	//Bad ISO8601 strings
+	testStrs.push_back("200905");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009367");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2007-04-05T24:50");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-000");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-M511");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009M511");
+	testTimestamps.push_back(-1);
+
+ 	testStrs.push_back("2009-05-19T14a39r");
+	testTimestamps.push_back(-1);
+ 
+	testStrs.push_back("2009-05-19T14:3924");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-0519");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-1914:39");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19 14:");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19r14:39");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19 14a39a22");
+	testTimestamps.push_back(-1);
+ 
+	testStrs.push_back("200912-01");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19 14a39a22");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19 14:39:22+06a00");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2009-05-19 146922.500");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2010-02-18T16.5:23.35:48");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2010-02-18T16:23.35:48");
+	testTimestamps.push_back(-1);
+
+	testStrs.push_back("2010-02-18T16:23.35:48.45");
+	testTimestamps.push_back(-1); 
+
+	testStrs.push_back("2009-05-19 14.5.44");
+	testTimestamps.push_back(-1); 
+
+	testStrs.push_back("2010-02-18T16:23.33.600");
+	testTimestamps.push_back(-1); 
+
+	testStrs.push_back("2010-02-18T16,25:23:48,444");
+	testTimestamps.push_back(-1);
 }
 
 int main()
@@ -83,18 +156,34 @@ int main()
 	Iso8601TestCases(testStrs, testTimestamps);
 	assert(testStrs.size() == testTimestamps.size());
 	
+	int errors = 0;
 	for(size_t i=0; i<testStrs.size(); i++)
 	{
+		cout << "Test case: " << testStrs[i] << endl;
 		struct tm dt;
 		bool ok = ParseIso8601Datetime(testStrs[i].c_str(), dt);
 		if(!ok)
 		{
-			cout << "Parse FAIL" << endl;
+			if(testTimestamps[i] < 0.0)
+				cout << "Parse fail as expected" << endl;
+			else
+			{
+				cout << "Parse FAIL as NOT EXPECTED" << endl;
+				errors++;
+			}
 			continue;
+		}
+		else
+		{
+			if(testTimestamps[i] < 0.0)
+			{
+				cout << "Parse should have FAILED" << endl;
+				errors ++;
+				continue;
+			}
 		}
 
 		time_t ts = mktime (&dt);
-		cout << "Test case: " << testStrs[i] << endl;
 		//cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," << dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << endl;
 
 		cout << ctime(&ts);// UTC date+time string
@@ -102,5 +191,6 @@ int main()
 		if(fabs((int64_t)ts - round(testTimestamps[i]))>1e-6) cout << " FAIL";
 		cout << endl;
 	}
+	cout << "Errors " << errors << endl;
 }
 

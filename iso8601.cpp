@@ -9,6 +9,73 @@
 #include "iso8601.h"
 using namespace std;
 
+//This string pattern matcher is stricter than what scanf provides
+bool MatchPattern2(const char *str, const char *pattern)
+{
+	size_t pc=0, pl=strlen(pattern), sc=0, sl=strlen(str);
+	while (pc<pl && sc<sl)
+	{
+		char code = pattern[pc];
+		char ch = str[sc];
+		if(code == 'd') //Digit
+		{
+			if(ch < '0' || ch > '9')
+			{
+				return false;
+			}
+			pc ++;
+			sc ++;
+			continue;
+		}
+		if(code == 'f') //2 digit padded float (decimal point is required)
+		{
+			if(pc>=pl || sc>=sl || ch < '0' || ch > '9')
+				return false;
+			sc ++;
+			ch = str[sc];
+			if(pc>=pl || sc>=sl || ch < '0' || ch > '9')
+				return false;
+			sc ++;
+			ch = str[sc];
+			if(pc>=pl || sc>=sl || ch != '.')
+				return false;
+			sc ++;
+			ch = str[sc];
+			while(ch >= '0' && ch <= '9')
+			{
+				sc++;
+				if(sc >= sl)
+					break;
+				ch = str[sc];				
+			}
+
+			pc ++;
+			continue;
+		}
+		if(code == ':' || code == '-' || code == '+') //Literal character
+		{
+			if(ch != code)
+				return false;
+			sc ++;
+			pc ++;
+			continue;
+		}
+		return false;
+	}
+	if(sc != sl) //All characters must match pattern
+		return false; 
+
+	return true;
+}
+
+bool MatchPattern(const char *str, const char *pattern)
+{
+	//cout << "a " << str << endl;
+	bool ret = MatchPattern2(str, pattern);
+	//cout << "result " << ret << endl;
+	return ret;
+}
+
 void ApplyTimezoneNormalize(struct tm &tmout, bool normalize, int tzh, int tzm)
 {
 	//Apply timezone to get UTC
@@ -27,80 +94,98 @@ void ApplyTimezoneNormalize(struct tm &tmout, bool normalize, int tzh, int tzm)
 bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 {
 	int y=1900,M=1,d=1;
-	char excess[101];
+	int sl = strlen(str);
 
 	//A better idea would be to put the shorter formats first, so they can be replaced by 
 	//more complete representations.
 
 	//Format 1 conventional date with dashes
-	int ret = sscanf(str, "%4d-%2d-%2d%100s", &y, &M, &d, excess);
-	if(ret == 3 && y >= 0 && M >= 0 && d >= 0)
+	if(sl == 10 && MatchPattern(str, "dddd-dd-dd"))
 	{
-		tmout.tm_year = y - 1900;
-		tmout.tm_mon = M - 1;
-		tmout.tm_mday = d;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		int ret = sscanf(str, "%4d-%2d-%2d", &y, &M, &d);
+		if(ret == 3 && y >= 0 && M >= 0 && d >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mon = M - 1;
+			tmout.tm_mday = d;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	//Format 2 plus signed year
-	y = 1900;
-	int ret2 = sscanf(str, "+%4d%100s", &y, excess);
-	if(ret2 == 1 && y >= 0)
+	if(sl == 5 && MatchPattern(str, "+dddd"))
 	{
-		tmout.tm_year = y - 1900;
-		tmout.tm_mon = 0;
-		tmout.tm_mday = 1;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		y = 1900;
+		int ret2 = sscanf(str, "%5d", &y);
+		if(ret2 == 1)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mon = 0;
+			tmout.tm_mday = 1;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	//Format 2b minus signed year
-	y = 100;
-	int ret2b = sscanf(str, "-%4d%100s", &y, excess);
-	if(ret2b == 1 && y >= 0)
+	if(sl == 5 && MatchPattern(str, "-dddd"))
 	{
-		tmout.tm_year = - y - 1900;
-		tmout.tm_mon = 0;
-		tmout.tm_mday = 1;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		y = 100;
+		int ret2b = sscanf(str, "%5d", &y);
+		if(ret2b == 1)
+		{
+			tmout.tm_year = - y - 1900;
+			tmout.tm_mon = 0;
+			tmout.tm_mday = 1;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	//Format 3 plain year
-	y = 1900;
-	int ret3 = sscanf(str, "%4d%100s", &y, excess);
-	if(ret3 == 1 && y >= 0)
+	if(sl == 4 && MatchPattern(str, "dddd"))
 	{
-		tmout.tm_year = y - 1900;
-		tmout.tm_mon = 0;
-		tmout.tm_mday = 1;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		y = 1900;
+		int ret3 = sscanf(str, "%4d", &y);
+		if(ret3 == 1 && y >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mon = 0;
+			tmout.tm_mday = 1;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	//Format 4 plain year and month
-	y = 1900; M = 1;
-	int ret5 = sscanf(str, "%4d-%2d%100s", &y, &M, excess);
-	if(ret5 == 2 && y >= 0 && M >= 0)
+	if(sl == 7 && MatchPattern(str, "dddd-dd"))
 	{
-		tmout.tm_year = y - 1900;
-		tmout.tm_mon = M - 1;
-		tmout.tm_mday = 1;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		y = 1900; M = 1;
+		int ret5 = sscanf(str, "%4d-%2d", &y, &M);
+		if(ret5 == 2 && y >= 0 && M >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mon = M - 1;
+			tmout.tm_mday = 1;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	//Format 5 full date with no dashes
-	y = 1900; M = 1; d = 1;
-	int ret4 = sscanf(str, "%4d%2d%2d%100s", &y, &M, &d, excess);
-	if(ret4 == 3 && y >= 0 && M >= 0 && d >= 0)
+	if(sl==8 && MatchPattern(str, "dddddddd"))
 	{
-		tmout.tm_year = y - 1900;
-		tmout.tm_mon = M - 1;
-		tmout.tm_mday = d;
-		ApplyTimezoneNormalize(tmout, normalize, 0, 0);
-		return true;
+		y = 1900; M = 1; d = 1;
+		int ret4 = sscanf(str, "%4d%2d%2d", &y, &M, &d);
+		if(ret4 == 3 && y >= 0 && M >= 0 && d >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mon = M - 1;
+			tmout.tm_mday = d;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
 	}
 
 	return false;
@@ -178,42 +263,53 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 	
 	//Format 1 full time
-	int ret = sscanf(baseTime.c_str(), "%2d:%2d:%f%100s", &h, &m, &s, excess);
-	if(ret == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+	if(baseTime.length() >= 8 && (MatchPattern(baseTime.c_str(), "dd:dd:f") || MatchPattern(baseTime.c_str(), "dd:dd:dd")))
 	{
-		tmout.tm_hour = h;
-		tmout.tm_min = m;
-		tmout.tm_sec = round(s);
-		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
-		return true;
+		int ret = sscanf(baseTime.c_str(), "%2d:%2d:%f%100s", &h, &m, &s, excess);
+		if(ret == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+		{
+			tmout.tm_hour = h;
+			tmout.tm_min = m;
+			tmout.tm_sec = round(s);
+			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			return true;
+		}
 	}
 
 	//Format 2 hours and minutes
-	h = 0; mf = 0.0f;
-	int ret2 = sscanf(baseTime.c_str(), "%2d:%f%100s", &h, &mf, excess);
-	if(ret2 == 2 && h >= 0 && mf >= 0)
+	if(baseTime.length() >= 5 && (MatchPattern(baseTime.c_str(), "dd:f") || MatchPattern(baseTime.c_str(), "dd:dd")))
 	{
-		tmout.tm_hour = h;
-		tmout.tm_min = mf;
-		tmout.tm_sec = round((mf - int(mf)) * 60.0);
-		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
-		return true;
+		h = 0; mf = 0.0f;
+		int ret2 = sscanf(baseTime.c_str(), "%2d:%f%100s", &h, &mf, excess);
+		if(ret2 == 2 && h >= 0 && mf >= 0)
+		{
+			tmout.tm_hour = h;
+			tmout.tm_min = mf;
+			tmout.tm_sec = round((mf - int(mf)) * 60.0);
+			if(h == 24 && mf != 0)
+				return false; //Invalid time
+			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			return true;
+		}
 	}
 
 	//Format 3 full time with no dashes
-	h = 0; m = 0; s = 0.0f;
-	int ret4 = sscanf(baseTime.c_str(), "%2d%2d%f%s", &h, &m, &s, excess);
-	if(ret4 == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+	if(baseTime.length() >= 6 && (MatchPattern(baseTime.c_str(), "ddddf") || MatchPattern(baseTime.c_str(), "dddddd")))
 	{
-		tmout.tm_hour = h;
-		tmout.tm_min = m;
-		tmout.tm_sec = round(s);
-		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
-		return true;
+		h = 0; m = 0; s = 0.0f;
+		int ret4 = sscanf(baseTime.c_str(), "%2d%2d%f%s", &h, &m, &s, excess);
+		if(ret4 == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+		{
+			tmout.tm_hour = h;
+			tmout.tm_min = m;
+			tmout.tm_sec = round(s);
+			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			return true;
+		}
 	}
 
 	//Format 4 hours and minutes, with no dashes
-	if(baseTime.size() > 2 && baseTime[2] != '.')
+	if(baseTime.size() >= 4 && (MatchPattern(baseTime.c_str(), "ddf") || MatchPattern(baseTime.c_str(), "dddd")))
 	{
 		h = 0; mf = 0.0f;
 		int ret5 = sscanf(baseTime.c_str(), "%2d%f%s", &h, &mf, excess);
@@ -228,16 +324,19 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 5 hours
-	hf = 0.0f;
-	int ret3 = sscanf(baseTime.c_str(), "%f%100s", &hf, excess);
-	if(ret3 == 1 && h >= 0 && h2 >= 0)
+	if(baseTime.size() >= 2 && (MatchPattern(baseTime.c_str(), "f") || MatchPattern(baseTime.c_str(), "dd")))
 	{
-		tmout.tm_hour = int(hf);
-		float mins = (hf - (float)tmout.tm_hour) * 60.0f;
-		tmout.tm_min = (int)mins;
-		tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
-		ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
-		return true;
+		hf = 0.0f;
+		int ret3 = sscanf(baseTime.c_str(), "%f%100s", &hf, excess);
+		if(ret3 == 1 && h >= 0 && h2 >= 0)
+		{
+			tmout.tm_hour = int(hf);
+			float mins = (hf - (float)tmout.tm_hour) * 60.0f;
+			tmout.tm_min = (int)mins;
+			tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
+			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			return true;
+		}
 	}
 
 	return false;
