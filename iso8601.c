@@ -5,7 +5,7 @@
 #include "iso8601.h"
 using namespace std;
 
-const int TMP_STRING_LEN = 100;
+#define TMP_STRING_LEN 100
 
 //This string pattern matcher is stricter than what scanf provides
 bool MatchPattern2(const char *str, const char *pattern)
@@ -74,33 +74,35 @@ bool MatchPattern(const char *str, const char *pattern)
 	return ret;
 }
 
-void ApplyTimezoneNormalize(struct tm &tmout, bool normalize, int tzh, int tzm)
+void Normalize(struct tm &tmout)
+{
+	//Normalize format
+	time_t ts = mktime (&tmout);
+
+	#ifdef __unix
+	struct tm tmp;
+	gmtime_r(&ts, &tmp);
+	memcpy(&tmout, &tmp, sizeof(struct tm));
+	#else
+	#if defined(_WIN32) || defined(_WIN64)
+	struct tm tmp;
+	gmtime_s(&ts, &tmp);
+	memcpy(&tmout, &tmp, sizeof(struct tm));
+	#else
+	#warning "Code is not thread safe because no safe alternative to gmtime was found"
+	struct tm *tmp = gmtime(&ts);
+	memcpy(&tmout, tmp, sizeof(struct tm));
+	#endif
+	#endif
+}
+
+void TmToUtc(struct tm &tmout, int timezoneMin)
 {
 	//Apply timezone to get UTC
-	tmout.tm_hour -= tzh;
-	tmout.tm_min -= tzm;
-
-	if(normalize)
-	{
-		//Normalize format
-		time_t ts = mktime (&tmout);
-
-		#ifdef __unix
-		struct tm tmp;
-		gmtime_r(&ts, &tmp);
-		memcpy(&tmout, &tmp, sizeof(struct tm));
-		#else
-		#if defined(_WIN32) || defined(_WIN64)
-		struct tm tmp;
-		gmtime_s(&ts, &tmp);
-		memcpy(&tmout, &tmp, sizeof(struct tm));
-		#else
-		#warning "Code is not thread safe because no alternative to gmtime was found"
-		struct tm *tmp = gmtime(&ts);
-		memcpy(&tmout, tmp, sizeof(struct tm));
-		#endif
-		#endif
-	}
+	int h = timezoneMin / 60;
+	tmout.tm_hour -= h;
+	tmout.tm_min -= (timezoneMin - h*60);
+	Normalize(tmout);
 }
 
 void CalcStartOfFirstWeek(int y, struct tm *sow)
@@ -110,7 +112,7 @@ void CalcStartOfFirstWeek(int y, struct tm *sow)
 	memset(&fourthjan,0x00,sizeof(struct tm));
 	fourthjan.tm_year = y - 1900;
 	fourthjan.tm_mday = 4;
-	ApplyTimezoneNormalize(fourthjan, true, 0, 0);
+	Normalize(fourthjan);
 
 	//Start of first week (the Monday before 4th Jan)
 	*sow = fourthjan;
@@ -118,10 +120,10 @@ void CalcStartOfFirstWeek(int y, struct tm *sow)
 		fourthjan.tm_wday = 7;
 	sow->tm_mday = fourthjan.tm_mday - fourthjan.tm_wday + 1; //Jump to monday
 	sow->tm_wday = 0;
-	ApplyTimezoneNormalize(*sow, true, 0, 0);
+	Normalize(*sow);
 }
 
-bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
+bool ParseIso8601Date(const char *str, struct tm &tmout)
 {
 	int y=1900,M=1,w=1,d=1;
 	int sl = strlen(str);
@@ -138,7 +140,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = M - 1;
 			tmout.tm_mday = d;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -153,7 +155,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = 0;
 			tmout.tm_mday = 1;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -168,7 +170,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = - y - 1900;
 			tmout.tm_mon = 0;
 			tmout.tm_mday = 1;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -183,7 +185,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = 0;
 			tmout.tm_mday = 1;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -198,7 +200,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = M - 1;
 			tmout.tm_mday = 1;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -213,7 +215,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = M - 1;
 			tmout.tm_mday = d;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -229,7 +231,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday = d;
 			if(d <= 0 || d > 366)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -245,7 +247,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday = d;
 			if(d <= 0 || d > 366)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -264,7 +266,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday += (d-1) + (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -283,7 +285,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday += (d-1) + (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -302,7 +304,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday += (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -321,7 +323,7 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_mday += (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
-			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -366,7 +368,7 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 	return true;
 }
 
-bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
+bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 {
 	int h=0,m=0;
 	float s=0.0f, mf=0.0f, hf=0.0f;
@@ -414,6 +416,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
 	}
+	if(timezoneOffsetMin != NULL)
+		*timezoneOffsetMin = (tzh*60) + tzm;
 	
 	//Format 1 full time
 	if(btl >= 8 && (MatchPattern(baseTime, "dd:dd:f") || MatchPattern(baseTime, "dd:dd:dd")))
@@ -424,7 +428,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_hour = h;
 			tmout.tm_min = m;
 			tmout.tm_sec = round(s);
-			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			//ApplyTimezone(tmout, tzh, tzm);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -441,7 +446,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_sec = round((mf - int(mf)) * 60.0);
 			if(h == 24 && mf != 0)
 				return false; //Invalid time
-			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			//ApplyTimezone(tmout, tzh, tzm);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -456,7 +462,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_hour = h;
 			tmout.tm_min = m;
 			tmout.tm_sec = round(s);
-			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			//ApplyTimezone(tmout, tzh, tzm);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -471,7 +478,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_hour = h;
 			tmout.tm_min = int(mf);
 			tmout.tm_sec = round((mf - tmout.tm_min)*60.0);
-			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			//ApplyTimezone(tmout, tzh, tzm);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -487,7 +495,8 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 			float mins = (hf - (float)tmout.tm_hour) * 60.0f;
 			tmout.tm_min = (int)mins;
 			tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
-			ApplyTimezoneNormalize(tmout, normalize, tzh, tzm);
+			//ApplyTimezone(tmout, tzh, tzm);
+			Normalize(tmout);
 			return true;
 		}
 	}
@@ -495,17 +504,19 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	return false;
 }
 
-bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
+bool ParseIso8601Datetime(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 {
 	//cout << str << endl;
 	memset(&tmout,0x00,sizeof(tmout));
 	tmout.tm_isdst = 0;
+	if(timezoneOffsetMin != NULL)
+		*timezoneOffsetMin = 0;
 
 	const char *tChar = strchr (str, 'T');	
 	bool ok = true;
 	if(tChar != NULL)
 	{
-		char dateStr[100];
+		char dateStr[TMP_STRING_LEN];
 		int dateLen = tChar - str;
 		if(dateLen >= (int)sizeof(dateStr))
 			return false; //Input too long
@@ -513,7 +524,7 @@ bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
 		dateStr[dateLen] = '\0';
 
 		int timeLen = strlen(str) - dateLen - 1;
-		char timeStr[100];
+		char timeStr[TMP_STRING_LEN];
 		if(timeLen >= (int)sizeof(timeStr))
 			return false; //Input too long
 		strncpy(timeStr, tChar+1, timeLen);
@@ -521,24 +532,18 @@ bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
 
 		//printf("split %s, %s\n", dateStr, timeStr);
 
-		ok = ParseIso8601Date(dateStr, tmout, false);
+		ok = ParseIso8601Date(dateStr, tmout);
 		if(!ok) return false;
-		ok = ParseIso8601Time(timeStr, tmout, false);
+		ok = ParseIso8601Time(timeStr, tmout, timezoneOffsetMin);
 		if(!ok) return false;
 	}
 	else
 	{
-		ok = ParseIso8601Date(str, tmout, false); //Only the date is specified
+		ok = ParseIso8601Date(str, tmout); //Only the date is specified
 		if(!ok) return false;
 	}
 
-	if(normalize)
-	{
-		//Normalize format
-		time_t ts = mktime (&tmout);
-		struct tm *tmp = gmtime(&ts);
-		memcpy(&tmout, tmp, sizeof(struct tm));
-	}
+	Normalize(tmout);
 
 	return ok;
 }

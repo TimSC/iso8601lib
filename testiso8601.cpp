@@ -28,6 +28,12 @@ void Iso8601TestCases(std::vector<std::string> &testStrs, std::vector<double> &t
 	testStrs.push_back("20170911T215213Z");
 	testTimestamps.push_back(1505166733);
 
+	testStrs.push_back("2010-W05-3");
+	testTimestamps.push_back(1265155200);
+
+	testStrs.push_back("2011-W25-6");
+	testTimestamps.push_back(1308960000);
+
 	//Subset of test cases from https://www.myintervals.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
 	testStrs.push_back("2009-12T12:34");
 	testTimestamps.push_back(1259670840);
@@ -191,7 +197,8 @@ int main()
 	{
 		cout << "Test case: " << testStrs[i] << endl;
 		struct tm dt;
-		bool ok = ParseIso8601Datetime(testStrs[i].c_str(), dt);
+		int timezoneMin = -1;
+		bool ok = ParseIso8601Datetime(testStrs[i].c_str(), dt, &timezoneMin);
 		if(!ok)
 		{
 			if(testTimestamps[i] < 0.0)
@@ -213,11 +220,17 @@ int main()
 			}
 		}
 
+		//Get timestamp and timezone info separately
 		time_t ts = mktime (&dt);
-		//cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," << dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << endl;
+		cout << 1900+dt.tm_year << "," << 1+dt.tm_mon << "," << dt.tm_mday << "," \
+			<< dt.tm_hour << "," << dt.tm_min << "," << dt.tm_sec << "," << timezoneMin << endl;
 
-		cout << ctime(&ts);// UTC date+time string
-		cout << (int64_t)ts << "=" << (int64_t)round(testTimestamps[i]); //UTC unix time-stamp
+		//Get UTC time
+		TmToUtc(dt, timezoneMin);
+		ts = mktime (&dt);
+
+		cout << "UTC " << ctime(&ts);// UTC date+time string
+		cout << "result " << (int64_t)ts << " = correct " << (int64_t)round(testTimestamps[i]); //UTC unix time-stamp
 		if(fabs((int64_t)ts - round(testTimestamps[i]))>1e-6)
 		{
 			cout << " FAIL";
