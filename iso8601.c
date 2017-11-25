@@ -1,11 +1,7 @@
-#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <iostream>
-#include <cstring>
-#include <string>
-#include <sstream>
-#include <cmath>
+#include <string.h>
+#include <math.h>
 #include "iso8601.h"
 using namespace std;
 
@@ -370,7 +366,7 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 
 bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 {
-	int h=0,h2=0,m=0;
+	int h=0,m=0;
 	float s=0.0f, mf=0.0f, hf=0.0f;
 	char excess[101];
 
@@ -385,28 +381,35 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 		firstTzChar = minusChar;
 
 	//Get time with no timezone info
-	string baseTime(str);
+	char baseTime[100];
 	if(firstTzChar != NULL)
 	{
 		int baseDateLen = firstTzChar - str;
-		baseTime.assign(str, baseDateLen);
+		if(baseDateLen >= 100)
+			return false; //Input too long
+		strncpy(baseTime, str, baseDateLen);
+		baseTime[baseDateLen] = '\0';
 	}
+	else
+		strncpy(baseTime, str, 99);
+	int btl = strlen(baseTime);
 
 	//Assume UTC if no timezone is specified
 	int tzh = 0, tzm = 0;
 	if(firstTzChar != NULL)
 	{
-		string tzStr(firstTzChar);
-		bool ok = ParseIso8601Timezone(tzStr.c_str(), tzh, tzm);
+		char tzStr[100];
+		strncpy(tzStr, firstTzChar, 99);
+		bool ok = ParseIso8601Timezone(tzStr, tzh, tzm);
 		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
 	}
 	
 	//Format 1 full time
-	if(baseTime.length() >= 8 && (MatchPattern(baseTime.c_str(), "dd:dd:f") || MatchPattern(baseTime.c_str(), "dd:dd:dd")))
+	if(btl >= 8 && (MatchPattern(baseTime, "dd:dd:f") || MatchPattern(baseTime, "dd:dd:dd")))
 	{
-		int ret = sscanf(baseTime.c_str(), "%2d:%2d:%f%100s", &h, &m, &s, excess);
-		if(ret == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+		int ret = sscanf(baseTime, "%2d:%2d:%f%100s", &h, &m, &s, excess);
+		if(ret == 3)
 		{
 			tmout.tm_hour = h;
 			tmout.tm_min = m;
@@ -417,11 +420,11 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 2 hours and minutes
-	if(baseTime.length() >= 5 && (MatchPattern(baseTime.c_str(), "dd:f") || MatchPattern(baseTime.c_str(), "dd:dd")))
+	if(btl >= 5 && (MatchPattern(baseTime, "dd:f") || MatchPattern(baseTime, "dd:dd")))
 	{
 		h = 0; mf = 0.0f;
-		int ret2 = sscanf(baseTime.c_str(), "%2d:%f%100s", &h, &mf, excess);
-		if(ret2 == 2 && h >= 0 && mf >= 0)
+		int ret2 = sscanf(baseTime, "%2d:%f%100s", &h, &mf, excess);
+		if(ret2 == 2)
 		{
 			tmout.tm_hour = h;
 			tmout.tm_min = mf;
@@ -434,11 +437,11 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 3 full time with no dashes
-	if(baseTime.length() >= 6 && (MatchPattern(baseTime.c_str(), "ddddf") || MatchPattern(baseTime.c_str(), "dddddd")))
+	if(btl >= 6 && (MatchPattern(baseTime, "ddddf") || MatchPattern(baseTime, "dddddd")))
 	{
 		h = 0; m = 0; s = 0.0f;
-		int ret4 = sscanf(baseTime.c_str(), "%2d%2d%f%s", &h, &m, &s, excess);
-		if(ret4 == 3 && h >= 0 && m >= 0 && s >= 0.0f)
+		int ret4 = sscanf(baseTime, "%2d%2d%f%s", &h, &m, &s, excess);
+		if(ret4 == 3)
 		{
 			tmout.tm_hour = h;
 			tmout.tm_min = m;
@@ -449,11 +452,11 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 4 hours and minutes, with no dashes
-	if(baseTime.size() >= 4 && (MatchPattern(baseTime.c_str(), "ddf") || MatchPattern(baseTime.c_str(), "dddd")))
+	if(btl >= 4 && (MatchPattern(baseTime, "ddf") || MatchPattern(baseTime, "dddd")))
 	{
 		h = 0; mf = 0.0f;
-		int ret5 = sscanf(baseTime.c_str(), "%2d%f%s", &h, &mf, excess);
-		if(ret5 == 2 && h >= 0 && mf >= 0.0f)
+		int ret5 = sscanf(baseTime, "%2d%f%s", &h, &mf, excess);
+		if(ret5 == 2)
 		{
 			tmout.tm_hour = h;
 			tmout.tm_min = int(mf);
@@ -464,11 +467,11 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 	}
 
 	//Format 5 hours
-	if(baseTime.size() >= 2 && (MatchPattern(baseTime.c_str(), "f") || MatchPattern(baseTime.c_str(), "dd")))
+	if(btl >= 2 && (MatchPattern(baseTime, "f") || MatchPattern(baseTime, "dd")))
 	{
 		hf = 0.0f;
-		int ret3 = sscanf(baseTime.c_str(), "%f%100s", &hf, excess);
-		if(ret3 == 1 && h >= 0 && h2 >= 0)
+		int ret3 = sscanf(baseTime, "%f%100s", &hf, excess);
+		if(ret3 == 1)
 		{
 			tmout.tm_hour = int(hf);
 			float mins = (hf - (float)tmout.tm_hour) * 60.0f;
@@ -493,16 +496,24 @@ bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
 	if(tChar != NULL)
 	{
 		int dateLen = tChar - str;
-		string dateStr(str, dateLen);
+		if(dateLen >= 100)
+			return false; //Input too long
+		char dateStr[100];
+		strncpy(dateStr, str, dateLen);
+		dateStr[dateLen] = '\0';
 
 		int timeLen = strlen(str) - dateLen - 1;
-		string timeStr(tChar+1, timeLen);
-		
-		//cout << "split " << dateStr << "," << timeStr << endl;
+		if(timeLen >= 100)
+			return false; //Input too long
+		char timeStr[100];
+		strncpy(timeStr, tChar+1, timeLen);
+		timeStr[timeLen] = '\0';
 
-		ok = ParseIso8601Date(dateStr.c_str(), tmout, false);
+		//printf("split %s, %s\n", dateStr, timeStr);
+
+		ok = ParseIso8601Date(dateStr, tmout, false);
 		if(!ok) return false;
-		ok = ParseIso8601Time(timeStr.c_str(), tmout, false);
+		ok = ParseIso8601Time(timeStr, tmout, false);
 		if(!ok) return false;
 	}
 	else

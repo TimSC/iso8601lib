@@ -1,8 +1,7 @@
 #ifndef _ISO8601_H
 #define _ISO8601_H
 
-#include <vector>
-#include <string>
+#include <time.h>
 #include <stdint.h>
 
 bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize = true);
