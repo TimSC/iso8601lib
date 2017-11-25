@@ -5,6 +5,8 @@
 #include "iso8601.h"
 using namespace std;
 
+const int TMP_STRING_LEN = 100;
+
 //This string pattern matcher is stricter than what scanf provides
 bool MatchPattern2(const char *str, const char *pattern)
 {
@@ -381,25 +383,33 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, bool normalize)
 		firstTzChar = minusChar;
 
 	//Get time with no timezone info
-	char baseTime[100];
+	char baseTime[TMP_STRING_LEN];
 	if(firstTzChar != NULL)
 	{
 		int baseDateLen = firstTzChar - str;
-		if(baseDateLen >= 100)
+		if(baseDateLen >= (int)sizeof(baseTime))
 			return false; //Input too long
 		strncpy(baseTime, str, baseDateLen);
 		baseTime[baseDateLen] = '\0';
 	}
 	else
-		strncpy(baseTime, str, 99);
+	{
+		if(strlen(str) >= sizeof(baseTime))
+			return false; //Input too long
+		strncpy(baseTime, str, sizeof(baseTime)-1);
+		baseTime[sizeof(baseTime)-1] = '\0';
+	}
 	int btl = strlen(baseTime);
 
 	//Assume UTC if no timezone is specified
 	int tzh = 0, tzm = 0;
 	if(firstTzChar != NULL)
 	{
-		char tzStr[100];
-		strncpy(tzStr, firstTzChar, 99);
+		char tzStr[TMP_STRING_LEN];
+		if(strlen(firstTzChar) >= sizeof(tzStr))
+			return false; //Input too long
+		strncpy(tzStr, firstTzChar, sizeof(tzStr)-1);
+		tzStr[sizeof(tzStr)-1] = '\0';
 		bool ok = ParseIso8601Timezone(tzStr, tzh, tzm);
 		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
@@ -495,17 +505,17 @@ bool ParseIso8601Datetime(const char *str, struct tm &tmout, bool normalize)
 	bool ok = true;
 	if(tChar != NULL)
 	{
-		int dateLen = tChar - str;
-		if(dateLen >= 100)
-			return false; //Input too long
 		char dateStr[100];
+		int dateLen = tChar - str;
+		if(dateLen >= (int)sizeof(dateStr))
+			return false; //Input too long
 		strncpy(dateStr, str, dateLen);
 		dateStr[dateLen] = '\0';
 
 		int timeLen = strlen(str) - dateLen - 1;
-		if(timeLen >= 100)
-			return false; //Input too long
 		char timeStr[100];
+		if(timeLen >= (int)sizeof(timeStr))
+			return false; //Input too long
 		strncpy(timeStr, tChar+1, timeLen);
 		timeStr[timeLen] = '\0';
 
