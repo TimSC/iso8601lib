@@ -1,4 +1,4 @@
-# cppiso8601
+# iso8601lib
 Parsing a subset of iso8601 datetimes, dates and times in C. Simply compile iso8601.c into your project and include iso8601.h.
 
 Only a subset of ISO 8601 is implemented: certain datetimes, dates or times are handled. Timezone is supported.
