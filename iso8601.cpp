@@ -52,7 +52,7 @@ bool MatchPattern2(const char *str, const char *pattern)
 			pc ++;
 			continue;
 		}
-		if(code == ':' || code == '-' || code == '+') //Literal character
+		if(code == ':' || code == '-' || code == '+' || code == 'W') //Literal character
 		{
 			if(ch != code)
 				return false;
@@ -86,14 +86,46 @@ void ApplyTimezoneNormalize(struct tm &tmout, bool normalize, int tzh, int tzm)
 	{
 		//Normalize format
 		time_t ts = mktime (&tmout);
+
+		#ifdef __unix
+		struct tm tmp;
+		gmtime_r(&ts, &tmp);
+		memcpy(&tmout, &tmp, sizeof(struct tm));
+		#else
+		#if defined(_WIN32) || defined(_WIN64)
+		struct tm tmp;
+		gmtime_s(&ts, &tmp);
+		memcpy(&tmout, &tmp, sizeof(struct tm));
+		#else
+		#warning "Code is not thread safe because no alternative to gmtime was found"
 		struct tm *tmp = gmtime(&ts);
 		memcpy(&tmout, tmp, sizeof(struct tm));
+		#endif
+		#endif
 	}
+}
+
+void CalcStartOfFirstWeek(int y, struct tm *sow)
+{
+	//Find start of week containing 4th Jan
+	struct tm fourthjan;
+	memset(&fourthjan,0x00,sizeof(struct tm));
+	fourthjan.tm_year = y - 1900;
+	fourthjan.tm_mday = 4;
+	ApplyTimezoneNormalize(fourthjan, true, 0, 0);
+
+	//Start of first week (the Monday before 4th Jan)
+	*sow = fourthjan;
+	if(fourthjan.tm_wday == 0)
+		fourthjan.tm_wday = 7;
+	sow->tm_mday = fourthjan.tm_mday - fourthjan.tm_wday + 1; //Jump to monday
+	sow->tm_wday = 0;
+	ApplyTimezoneNormalize(*sow, true, 0, 0);
 }
 
 bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 {
-	int y=1900,M=1,d=1;
+	int y=1900,M=1,w=1,d=1;
 	int sl = strlen(str);
 
 	//A better idea would be to put the shorter formats first, so they can be replaced by 
@@ -183,6 +215,114 @@ bool ParseIso8601Date(const char *str, struct tm &tmout, bool normalize)
 			tmout.tm_year = y - 1900;
 			tmout.tm_mon = M - 1;
 			tmout.tm_mday = d;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 6a ordinal date with dashes
+	if(sl==8 && MatchPattern(str, "dddd-ddd"))
+	{
+		y = 1900; d = 1;
+		int ret4 = sscanf(str, "%4d-%3d", &y, &d);
+		if(ret4 == 2 && y >= 0 && d >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mday = d;
+			if(d <= 0 || d > 366)
+				return false;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 6b ordinal date
+	if(sl==7 && MatchPattern(str, "ddddddd"))
+	{
+		y = 1900; d = 1;
+		int ret4 = sscanf(str, "%4d%3d", &y, &d);
+		if(ret4 == 2 && y >= 0 && d >= 0)
+		{
+			tmout.tm_year = y - 1900;
+			tmout.tm_mday = d;
+			if(d <= 0 || d > 366)
+				return false;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 7a ISO week day
+	if(sl==10 && MatchPattern(str, "dddd-Wdd-d"))
+	{
+		y = 1900; w = 1; d = 1;
+		int ret4 = sscanf(str, "%4d-W%2d-%1d", &y, &w, &d);
+		if(ret4 == 3)
+		{
+			struct tm sow;
+			CalcStartOfFirstWeek(y, &sow);
+
+			tmout = sow;
+			tmout.tm_mday += (d-1) + (w-1)*7;
+			if(d <= 0 || d > 7)
+				return false;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 7a ISO week day, no dashes
+	if(sl==8 && MatchPattern(str, "ddddWddd"))
+	{
+		y = 1900; w = 1; d = 1;
+		int ret4 = sscanf(str, "%4dW%2d%1d", &y, &w, &d);
+		if(ret4 == 3)
+		{
+			struct tm sow;
+			CalcStartOfFirstWeek(y, &sow);
+
+			tmout = sow;
+			tmout.tm_mday += (d-1) + (w-1)*7;
+			if(d <= 0 || d > 7)
+				return false;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 8a ISO week
+	if(sl==8 && MatchPattern(str, "dddd-Wdd"))
+	{
+		y = 1900; w = 1;
+		int ret4 = sscanf(str, "%4d-W%2d", &y, &w);
+		if(ret4 == 2)
+		{
+			struct tm sow;
+			CalcStartOfFirstWeek(y, &sow);
+
+			tmout = sow;
+			tmout.tm_mday += (w-1)*7;
+			if(d <= 0 || d > 7)
+				return false;
+			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
+			return true;
+		}
+	}
+
+	//Format 8b ISO week, no dash
+	if(sl==7 && MatchPattern(str, "ddddWdd"))
+	{
+		y = 1900; w = 1;
+		int ret4 = sscanf(str, "%4dW%2d", &y, &w);
+		if(ret4 == 2)
+		{
+			struct tm sow;
+			CalcStartOfFirstWeek(y, &sow);
+
+			tmout = sow;
+			tmout.tm_mday += (w-1)*7;
+			if(d <= 0 || d > 7)
+				return false;
 			ApplyTimezoneNormalize(tmout, normalize, 0, 0);
 			return true;
 		}
