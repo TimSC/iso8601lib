@@ -4,7 +4,7 @@ Parsing a subset of iso8601 datetimes, dates and times in C. Simply compile iso8
 Only a subset of ISO 8601 is implemented: certain datetimes, dates or times are handled. Timezone is supported.
 Output tm struct with timezone offset. This can be converted to UTC using TmToUtc(). tm structs can be converted to POSIX time using mktime.
 
-No "representation with reduced accuracy". No leap seconds. No commas for floats.
+No leap seconds. No commas for floats.
 
 Inspired by https://stackoverflow.com/a/26896792/4288232 and https://www.myintervals.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
 

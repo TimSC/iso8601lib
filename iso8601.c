@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 #include "iso8601.h"
-using namespace std;
 
 #define TMP_STRING_LEN 100
 
@@ -74,34 +74,41 @@ bool MatchPattern(const char *str, const char *pattern)
 	return ret;
 }
 
-void Normalize(struct tm &tmout)
+void PlatformGmtime(time_t ts, struct tm *tmout)
 {
-	//Normalize format
-	time_t ts = mktime (&tmout);
-
 	#ifdef __unix
-	struct tm tmp;
-	gmtime_r(&ts, &tmp);
-	memcpy(&tmout, &tmp, sizeof(struct tm));
+		gmtime_r(&ts, tmout);
 	#else
-	#if defined(_WIN32) || defined(_WIN64)
-	struct tm tmp;
-	gmtime_s(&ts, &tmp);
-	memcpy(&tmout, &tmp, sizeof(struct tm));
-	#else
-	#warning "Code is not thread safe because no safe alternative to gmtime was found"
-	struct tm *tmp = gmtime(&ts);
-	memcpy(&tmout, tmp, sizeof(struct tm));
-	#endif
+		#if defined(_WIN32) || defined(_WIN64)
+		gmtime_s(&ts, tmout);
+		#else
+		#warning "Code is not thread safe because no safe alternative to gmtime was found"
+		struct tm *tmp = gmtime(&ts);
+		memcpy(tmout, tmp, sizeof(struct tm));
+		#endif
 	#endif
 }
 
-void TmToUtc(struct tm &tmout, int timezoneMin)
+void Normalize(struct tm *tmout)
+{
+	//Normalize format
+	time_t ts = mktime (tmout);
+	PlatformGmtime(ts, tmout);
+}
+
+void GetUtcTimeNow(struct tm *tmnow)
+{
+	time_t ts;
+	time (&ts);
+	PlatformGmtime(ts, tmnow);
+}
+
+void TmToUtc(struct tm *tmout, int timezoneMin)
 {
 	//Apply timezone to get UTC
 	int h = timezoneMin / 60;
-	tmout.tm_hour -= h;
-	tmout.tm_min -= (timezoneMin - h*60);
+	tmout->tm_hour -= h;
+	tmout->tm_min -= (timezoneMin - h*60);
 	Normalize(tmout);
 }
 
@@ -112,7 +119,7 @@ void CalcStartOfFirstWeek(int y, struct tm *sow)
 	memset(&fourthjan,0x00,sizeof(struct tm));
 	fourthjan.tm_year = y - 1900;
 	fourthjan.tm_mday = 4;
-	Normalize(fourthjan);
+	Normalize(&fourthjan);
 
 	//Start of first week (the Monday before 4th Jan)
 	*sow = fourthjan;
@@ -120,41 +127,68 @@ void CalcStartOfFirstWeek(int y, struct tm *sow)
 		fourthjan.tm_wday = 7;
 	sow->tm_mday = fourthjan.tm_mday - fourthjan.tm_wday + 1; //Jump to monday
 	sow->tm_wday = 0;
-	Normalize(*sow);
+	Normalize(sow);
 }
 
-bool ParseIso8601Date(const char *str, struct tm &tmout)
+bool ParseIso8601Date(const char *str, struct tm *tmout)
 {
 	int y=1900,M=1,w=1,d=1;
 	int sl = strlen(str);
 
-	//A better idea would be to put the shorter formats first, so they can be replaced by 
-	//more complete representations.
-
-	//Format 1 conventional date with dashes
-	if(sl == 10 && MatchPattern(str, "dddd-dd-dd"))
+	//Format 1a Complete date
+	if(sl==8 && MatchPattern(str, "dddddddd"))
 	{
-		int ret = sscanf(str, "%4d-%2d-%2d", &y, &M, &d);
-		if(ret == 3 && y >= 0 && M >= 0 && d >= 0)
+		y = 1900; M = 1; d = 1;
+		int ret4 = sscanf(str, "%4d%2d%2d", &y, &M, &d);
+		if(ret4 == 3)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mon = M - 1;
-			tmout.tm_mday = d;
+			tmout->tm_year = y - 1900;
+			tmout->tm_mon = M - 1;
+			tmout->tm_mday = d;
 			Normalize(tmout);
 			return true;
 		}
 	}
 
-	//Format 2 plus signed year
+	//Format 1b Complete date, extended format
+	if(sl == 10 && MatchPattern(str, "dddd-dd-dd"))
+	{
+		int ret = sscanf(str, "%4d-%2d-%2d", &y, &M, &d);
+		if(ret == 3)
+		{
+			tmout->tm_year = y - 1900;
+			tmout->tm_mon = M - 1;
+			tmout->tm_mday = d;
+			Normalize(tmout);
+			return true;
+		}
+	}
+
+	//Format 2 month and year
+	if(sl == 7 && MatchPattern(str, "dddd-dd"))
+	{
+		y = 1900; M = 1;
+		int ret5 = sscanf(str, "%4d-%2d", &y, &M);
+		if(ret5 == 2)
+		{
+			tmout->tm_year = y - 1900;
+			tmout->tm_mon = M - 1;
+			tmout->tm_mday = 1;
+			Normalize(tmout);
+			return true;
+		}
+	}
+
+	//Format 3a plus signed year
 	if(sl == 5 && MatchPattern(str, "+dddd"))
 	{
 		y = 1900;
 		int ret2 = sscanf(str, "%5d", &y);
 		if(ret2 == 1)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mon = 0;
-			tmout.tm_mday = 1;
+			tmout->tm_year = y - 1900;
+			tmout->tm_mon = 0;
+			tmout->tm_mday = 1;
 			Normalize(tmout);
 			return true;
 		}
@@ -167,68 +201,73 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 		int ret2b = sscanf(str, "%5d", &y);
 		if(ret2b == 1)
 		{
-			tmout.tm_year = - y - 1900;
-			tmout.tm_mon = 0;
-			tmout.tm_mday = 1;
+			tmout->tm_year = - y - 1900;
+			tmout->tm_mon = 0;
+			tmout->tm_mday = 1;
 			Normalize(tmout);
 			return true;
 		}
 	}
 
-	//Format 3 plain year
+	//Format 3c plain year
 	if(sl == 4 && MatchPattern(str, "dddd"))
 	{
 		y = 1900;
 		int ret3 = sscanf(str, "%4d", &y);
-		if(ret3 == 1 && y >= 0)
+		if(ret3 == 1)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mon = 0;
-			tmout.tm_mday = 1;
+			tmout->tm_year = y - 1900;
+			tmout->tm_mon = 0;
+			tmout->tm_mday = 1;
 			Normalize(tmout);
 			return true;
 		}
 	}
 
-	//Format 4 plain year and month
-	if(sl == 7 && MatchPattern(str, "dddd-dd"))
+	//Format 4 century
+	if(sl == 2 && MatchPattern(str, "dd"))
 	{
-		y = 1900; M = 1;
-		int ret5 = sscanf(str, "%4d-%2d", &y, &M);
-		if(ret5 == 2 && y >= 0 && M >= 0)
+		y = 1900;
+		int ret3 = sscanf(str, "%2d", &y);
+		if(ret3 == 1)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mon = M - 1;
-			tmout.tm_mday = 1;
+			tmout->tm_year = y*100 - 1900;
+			tmout->tm_mon = 0;
+			tmout->tm_mday = 1;
 			Normalize(tmout);
 			return true;
 		}
 	}
 
-	//Format 5 full date with no dashes
-	if(sl==8 && MatchPattern(str, "dddddddd"))
+#if 0
+	//Format 5 date in current century, is this common enough to enable? it confuses some tests.
+	if(sl == 6 && MatchPattern(str, "dddddd"))
 	{
-		y = 1900; M = 1; d = 1;
-		int ret4 = sscanf(str, "%4d%2d%2d", &y, &M, &d);
-		if(ret4 == 3 && y >= 0 && M >= 0 && d >= 0)
+		y = 1900;
+		int ret3 = sscanf(str, "%2d", &y);
+		if(ret3 == 1)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mon = M - 1;
-			tmout.tm_mday = d;
+			struct tm tmnow;
+			GetUtcTimeNow(tmnow);
+
+			tmout->tm_year = (tmnow.tm_year/100)*100 + y - 1900;
+			tmout->tm_mon = 0;
+			tmout->tm_mday = 1;
 			Normalize(tmout);
 			return true;
 		}
 	}
+#endif
 
 	//Format 6a ordinal date with dashes
 	if(sl==8 && MatchPattern(str, "dddd-ddd"))
 	{
 		y = 1900; d = 1;
 		int ret4 = sscanf(str, "%4d-%3d", &y, &d);
-		if(ret4 == 2 && y >= 0 && d >= 0)
+		if(ret4 == 2)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mday = d;
+			tmout->tm_year = y - 1900;
+			tmout->tm_mday = d;
 			if(d <= 0 || d > 366)
 				return false;
 			Normalize(tmout);
@@ -241,10 +280,10 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 	{
 		y = 1900; d = 1;
 		int ret4 = sscanf(str, "%4d%3d", &y, &d);
-		if(ret4 == 2 && y >= 0 && d >= 0)
+		if(ret4 == 2)
 		{
-			tmout.tm_year = y - 1900;
-			tmout.tm_mday = d;
+			tmout->tm_year = y - 1900;
+			tmout->tm_mday = d;
 			if(d <= 0 || d > 366)
 				return false;
 			Normalize(tmout);
@@ -262,8 +301,8 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 			struct tm sow;
 			CalcStartOfFirstWeek(y, &sow);
 
-			tmout = sow;
-			tmout.tm_mday += (d-1) + (w-1)*7;
+			*tmout = sow;
+			tmout->tm_mday += (d-1) + (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
 			Normalize(tmout);
@@ -281,8 +320,8 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 			struct tm sow;
 			CalcStartOfFirstWeek(y, &sow);
 
-			tmout = sow;
-			tmout.tm_mday += (d-1) + (w-1)*7;
+			*tmout = sow;
+			tmout->tm_mday += (d-1) + (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
 			Normalize(tmout);
@@ -300,8 +339,8 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 			struct tm sow;
 			CalcStartOfFirstWeek(y, &sow);
 
-			tmout = sow;
-			tmout.tm_mday += (w-1)*7;
+			*tmout = sow;
+			tmout->tm_mday += (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
 			Normalize(tmout);
@@ -319,8 +358,8 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 			struct tm sow;
 			CalcStartOfFirstWeek(y, &sow);
 
-			tmout = sow;
-			tmout.tm_mday += (w-1)*7;
+			*tmout = sow;
+			tmout->tm_mday += (w-1)*7;
 			if(d <= 0 || d > 7)
 				return false;
 			Normalize(tmout);
@@ -331,10 +370,10 @@ bool ParseIso8601Date(const char *str, struct tm &tmout)
 	return false;
 }
 
-bool ParseIso8601Timezone(const char *str, int &h, int &m)
+bool ParseIso8601Timezone(const char *str, int *h, int *m)
 {
-	h = 0;
-	m = 0;
+	*h = 0;
+	*m = 0;
 
 	//Format 1 zulu time
 	if(strcmp(str, "Z") == 0)
@@ -343,32 +382,32 @@ bool ParseIso8601Timezone(const char *str, int &h, int &m)
 	//Format 2
 	char sign;
 	int hv=0, mv=0;
-	int ret = sscanf(str, "%c%2d%2d", &sign, &h, &m);
+	int ret = sscanf(str, "%c%2d%2d", &sign, h, m);
 	if(ret < 1)
-		h = 0;
+		*h = 0;
 	if(ret < 2)
-		m = 0;
+		*m = 0;
 
 	//Format 3
 	int ret2 = sscanf(str, "%c%2d:%2d", &sign, &hv, &mv);
 	if(ret2 > ret)
 	{
-		h = hv;
+		*h = hv;
 		if(ret2 >= 2)
-			m = mv;
+			*m = mv;
 	}
 
 	if(ret == 0 && ret2 == 0)
 		return false;
 
 	if(sign == '-')
-		h = -h;
+		*h = -(*h);
 	if(h < 0)
-		m = -m;
+		*m = -(*m);
 	return true;
 }
 
-bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
+bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 {
 	int h=0,m=0;
 	float s=0.0f, mf=0.0f, hf=0.0f;
@@ -412,7 +451,7 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 			return false; //Input too long
 		strncpy(tzStr, firstTzChar, sizeof(tzStr)-1);
 		tzStr[sizeof(tzStr)-1] = '\0';
-		bool ok = ParseIso8601Timezone(tzStr, tzh, tzm);
+		bool ok = ParseIso8601Timezone(tzStr, &tzh, &tzm);
 		if(!ok) return false;
 		//cout << "tz " << tzh << "," << tzm << endl;
 	}
@@ -425,9 +464,9 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 		int ret = sscanf(baseTime, "%2d:%2d:%f%100s", &h, &m, &s, excess);
 		if(ret == 3)
 		{
-			tmout.tm_hour = h;
-			tmout.tm_min = m;
-			tmout.tm_sec = round(s);
+			tmout->tm_hour = h;
+			tmout->tm_min = m;
+			tmout->tm_sec = round(s);
 			//ApplyTimezone(tmout, tzh, tzm);
 			Normalize(tmout);
 			return true;
@@ -441,9 +480,9 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 		int ret2 = sscanf(baseTime, "%2d:%f%100s", &h, &mf, excess);
 		if(ret2 == 2)
 		{
-			tmout.tm_hour = h;
-			tmout.tm_min = mf;
-			tmout.tm_sec = round((mf - int(mf)) * 60.0);
+			tmout->tm_hour = h;
+			tmout->tm_min = mf;
+			tmout->tm_sec = round((mf - (int)(mf)) * 60.0);
 			if(h == 24 && mf != 0)
 				return false; //Invalid time
 			//ApplyTimezone(tmout, tzh, tzm);
@@ -459,9 +498,9 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 		int ret4 = sscanf(baseTime, "%2d%2d%f%s", &h, &m, &s, excess);
 		if(ret4 == 3)
 		{
-			tmout.tm_hour = h;
-			tmout.tm_min = m;
-			tmout.tm_sec = round(s);
+			tmout->tm_hour = h;
+			tmout->tm_min = m;
+			tmout->tm_sec = round(s);
 			//ApplyTimezone(tmout, tzh, tzm);
 			Normalize(tmout);
 			return true;
@@ -475,9 +514,9 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 		int ret5 = sscanf(baseTime, "%2d%f%s", &h, &mf, excess);
 		if(ret5 == 2)
 		{
-			tmout.tm_hour = h;
-			tmout.tm_min = int(mf);
-			tmout.tm_sec = round((mf - tmout.tm_min)*60.0);
+			tmout->tm_hour = h;
+			tmout->tm_min = (int)(mf);
+			tmout->tm_sec = round((mf - tmout->tm_min)*60.0);
 			//ApplyTimezone(tmout, tzh, tzm);
 			Normalize(tmout);
 			return true;
@@ -491,10 +530,10 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 		int ret3 = sscanf(baseTime, "%f%100s", &hf, excess);
 		if(ret3 == 1)
 		{
-			tmout.tm_hour = int(hf);
-			float mins = (hf - (float)tmout.tm_hour) * 60.0f;
-			tmout.tm_min = (int)mins;
-			tmout.tm_sec = round((mins - (float)tmout.tm_min) * 60.0f);
+			tmout->tm_hour = (int)(hf);
+			float mins = (hf - (float)tmout->tm_hour) * 60.0f;
+			tmout->tm_min = (int)mins;
+			tmout->tm_sec = round((mins - (float)tmout->tm_min) * 60.0f);
 			//ApplyTimezone(tmout, tzh, tzm);
 			Normalize(tmout);
 			return true;
@@ -504,11 +543,11 @@ bool ParseIso8601Time(const char *str, struct tm &tmout, int *timezoneOffsetMin)
 	return false;
 }
 
-bool ParseIso8601Datetime(const char *str, struct tm &tmout, int *timezoneOffsetMin)
+bool ParseIso8601Datetime(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 {
 	//cout << str << endl;
-	memset(&tmout,0x00,sizeof(tmout));
-	tmout.tm_isdst = 0;
+	memset(tmout,0x00,sizeof(struct tm));
+	tmout->tm_isdst = 0;
 	if(timezoneOffsetMin != NULL)
 		*timezoneOffsetMin = 0;
 
