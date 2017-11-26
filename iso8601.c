@@ -402,7 +402,7 @@ bool ParseIso8601Timezone(const char *str, int *h, int *m)
 
 	if(sign == '-')
 		*h = -(*h);
-	if(h < 0)
+	if(*h < 0)
 		*m = -(*m);
 	return true;
 }
