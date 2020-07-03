@@ -139,7 +139,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==8 && MatchPattern(str, "dddddddd"))
 	{
 		y = 1900; M = 1; d = 1;
-		int ret4 = sscanf(str, "%4d%2d%2d", &y, &M, &d);
+		int ret4 = sscanf_s(str, "%4d%2d%2d", &y, &M, &d);
 		if(ret4 == 3)
 		{
 			tmout->tm_year = y - 1900;
@@ -153,7 +153,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	//Format 1b Complete date, extended format
 	if(sl == 10 && MatchPattern(str, "dddd-dd-dd"))
 	{
-		int ret = sscanf(str, "%4d-%2d-%2d", &y, &M, &d);
+		int ret = sscanf_s(str, "%4d-%2d-%2d", &y, &M, &d);
 		if(ret == 3)
 		{
 			tmout->tm_year = y - 1900;
@@ -168,7 +168,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 7 && MatchPattern(str, "dddd-dd"))
 	{
 		y = 1900; M = 1;
-		int ret5 = sscanf(str, "%4d-%2d", &y, &M);
+		int ret5 = sscanf_s(str, "%4d-%2d", &y, &M);
 		if(ret5 == 2)
 		{
 			tmout->tm_year = y - 1900;
@@ -183,7 +183,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 5 && MatchPattern(str, "+dddd"))
 	{
 		y = 1900;
-		int ret2 = sscanf(str, "%5d", &y);
+		int ret2 = sscanf_s(str, "%5d", &y);
 		if(ret2 == 1)
 		{
 			tmout->tm_year = y - 1900;
@@ -198,7 +198,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 5 && MatchPattern(str, "-dddd"))
 	{
 		y = 100;
-		int ret2b = sscanf(str, "%5d", &y);
+		int ret2b = sscanf_s(str, "%5d", &y);
 		if(ret2b == 1)
 		{
 			tmout->tm_year = - y - 1900;
@@ -213,7 +213,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 4 && MatchPattern(str, "dddd"))
 	{
 		y = 1900;
-		int ret3 = sscanf(str, "%4d", &y);
+		int ret3 = sscanf_s(str, "%4d", &y);
 		if(ret3 == 1)
 		{
 			tmout->tm_year = y - 1900;
@@ -228,7 +228,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 2 && MatchPattern(str, "dd"))
 	{
 		y = 1900;
-		int ret3 = sscanf(str, "%2d", &y);
+		int ret3 = sscanf_s(str, "%2d", &y);
 		if(ret3 == 1)
 		{
 			tmout->tm_year = y*100 - 1900;
@@ -244,7 +244,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl == 6 && MatchPattern(str, "dddddd"))
 	{
 		y = 1900;
-		int ret3 = sscanf(str, "%2d", &y);
+		int ret3 = sscanf_s(str, "%2d", &y);
 		if(ret3 == 1)
 		{
 			struct tm tmnow;
@@ -263,7 +263,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==8 && MatchPattern(str, "dddd-ddd"))
 	{
 		y = 1900; d = 1;
-		int ret4 = sscanf(str, "%4d-%3d", &y, &d);
+		int ret4 = sscanf_s(str, "%4d-%3d", &y, &d);
 		if(ret4 == 2)
 		{
 			tmout->tm_year = y - 1900;
@@ -279,7 +279,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==7 && MatchPattern(str, "ddddddd"))
 	{
 		y = 1900; d = 1;
-		int ret4 = sscanf(str, "%4d%3d", &y, &d);
+		int ret4 = sscanf_s(str, "%4d%3d", &y, &d);
 		if(ret4 == 2)
 		{
 			tmout->tm_year = y - 1900;
@@ -295,7 +295,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==10 && MatchPattern(str, "dddd-Wdd-d"))
 	{
 		y = 1900; w = 1; d = 1;
-		int ret4 = sscanf(str, "%4d-W%2d-%1d", &y, &w, &d);
+		int ret4 = sscanf_s(str, "%4d-W%2d-%1d", &y, &w, &d);
 		if(ret4 == 3)
 		{
 			struct tm sow;
@@ -314,7 +314,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==8 && MatchPattern(str, "ddddWddd"))
 	{
 		y = 1900; w = 1; d = 1;
-		int ret4 = sscanf(str, "%4dW%2d%1d", &y, &w, &d);
+		int ret4 = sscanf_s(str, "%4dW%2d%1d", &y, &w, &d);
 		if(ret4 == 3)
 		{
 			struct tm sow;
@@ -333,7 +333,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==8 && MatchPattern(str, "dddd-Wdd"))
 	{
 		y = 1900; w = 1;
-		int ret4 = sscanf(str, "%4d-W%2d", &y, &w);
+		int ret4 = sscanf_s(str, "%4d-W%2d", &y, &w);
 		if(ret4 == 2)
 		{
 			struct tm sow;
@@ -352,7 +352,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 	if(sl==7 && MatchPattern(str, "ddddWdd"))
 	{
 		y = 1900; w = 1;
-		int ret4 = sscanf(str, "%4dW%2d", &y, &w);
+		int ret4 = sscanf_s(str, "%4dW%2d", &y, &w);
 		if(ret4 == 2)
 		{
 			struct tm sow;
@@ -382,14 +382,14 @@ bool ParseIso8601Timezone(const char *str, int *h, int *m)
 	//Format 2
 	char sign;
 	int hv=0, mv=0;
-	int ret = sscanf(str, "%c%2d%2d", &sign, h, m);
+	int ret = sscanf_s(str, "%c%2d%2d", &sign, 1, h, m);
 	if(ret < 1)
 		*h = 0;
 	if(ret < 2)
 		*m = 0;
 
 	//Format 3
-	int ret2 = sscanf(str, "%c%2d:%2d", &sign, &hv, &mv);
+	int ret2 = sscanf_s(str, "%c%2d:%2d", &sign, 1, &hv, &mv);
 	if(ret2 > ret)
 	{
 		*h = hv;
@@ -430,14 +430,14 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int baseDateLen = firstTzChar - str;
 		if(baseDateLen >= (int)sizeof(baseTime))
 			return false; //Input too long
-		strncpy(baseTime, str, baseDateLen);
+		strncpy_s(baseTime, str, baseDateLen);
 		baseTime[baseDateLen] = '\0';
 	}
 	else
 	{
 		if(strlen(str) >= sizeof(baseTime))
 			return false; //Input too long
-		strncpy(baseTime, str, sizeof(baseTime)-1);
+		strncpy_s(baseTime, str, sizeof(baseTime)-1);
 		baseTime[sizeof(baseTime)-1] = '\0';
 	}
 	int btl = strlen(baseTime);
@@ -449,7 +449,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		char tzStr[TMP_STRING_LEN];
 		if(strlen(firstTzChar) >= sizeof(tzStr))
 			return false; //Input too long
-		strncpy(tzStr, firstTzChar, sizeof(tzStr)-1);
+		strncpy_s(tzStr, firstTzChar, sizeof(tzStr)-1);
 		tzStr[sizeof(tzStr)-1] = '\0';
 		bool ok = ParseIso8601Timezone(tzStr, &tzh, &tzm);
 		if(!ok) return false;
@@ -461,7 +461,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	//Format 1 full time
 	if(btl >= 8 && (MatchPattern(baseTime, "dd:dd:f") || MatchPattern(baseTime, "dd:dd:dd")))
 	{
-		int ret = sscanf(baseTime, "%2d:%2d:%f%100s", &h, &m, &s, excess);
+		int ret = sscanf_s(baseTime, "%2d:%2d:%f%100s", &h, &m, &s, excess, 100);
 		if(ret == 3)
 		{
 			tmout->tm_hour = h;
@@ -477,7 +477,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	if(btl >= 5 && (MatchPattern(baseTime, "dd:f") || MatchPattern(baseTime, "dd:dd")))
 	{
 		h = 0; mf = 0.0f;
-		int ret2 = sscanf(baseTime, "%2d:%f%100s", &h, &mf, excess);
+		int ret2 = sscanf_s(baseTime, "%2d:%f%100s", &h, &mf, excess, 100);
 		if(ret2 == 2)
 		{
 			tmout->tm_hour = h;
@@ -495,7 +495,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	if(btl >= 6 && (MatchPattern(baseTime, "ddddf") || MatchPattern(baseTime, "dddddd")))
 	{
 		h = 0; m = 0; s = 0.0f;
-		int ret4 = sscanf(baseTime, "%2d%2d%f%s", &h, &m, &s, excess);
+		int ret4 = sscanf_s(baseTime, "%2d%2d%f%s", &h, &m, &s, excess, 100);
 		if(ret4 == 3)
 		{
 			tmout->tm_hour = h;
@@ -511,7 +511,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	if(btl >= 4 && (MatchPattern(baseTime, "ddf") || MatchPattern(baseTime, "dddd")))
 	{
 		h = 0; mf = 0.0f;
-		int ret5 = sscanf(baseTime, "%2d%f%s", &h, &mf, excess);
+		int ret5 = sscanf_s(baseTime, "%2d%f%s", &h, &mf, excess, 100);
 		if(ret5 == 2)
 		{
 			tmout->tm_hour = h;
@@ -527,7 +527,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	if(btl >= 2 && (MatchPattern(baseTime, "f") || MatchPattern(baseTime, "dd")))
 	{
 		hf = 0.0f;
-		int ret3 = sscanf(baseTime, "%f%100s", &hf, excess);
+		int ret3 = sscanf_s(baseTime, "%f%100s", &hf, excess, 100);
 		if(ret3 == 1)
 		{
 			tmout->tm_hour = (int)(hf);
@@ -559,14 +559,14 @@ bool ParseIso8601Datetime(const char *str, struct tm *tmout, int *timezoneOffset
 		int dateLen = tChar - str;
 		if(dateLen >= (int)sizeof(dateStr))
 			return false; //Input too long
-		strncpy(dateStr, str, dateLen);
+		strncpy_s(dateStr, str, dateLen);
 		dateStr[dateLen] = '\0';
 
 		int timeLen = strlen(str) - dateLen - 1;
 		char timeStr[TMP_STRING_LEN];
 		if(timeLen >= (int)sizeof(timeStr))
 			return false; //Input too long
-		strncpy(timeStr, tChar+1, timeLen);
+		strncpy_s(timeStr, tChar+1, timeLen);
 		timeStr[timeLen] = '\0';
 
 		//printf("split %s, %s\n", dateStr, timeStr);
