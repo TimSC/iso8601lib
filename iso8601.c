@@ -89,10 +89,14 @@ void PlatformGmtime(time_t ts, struct tm *tmout)
 	#endif
 }
 
+#if defined(_WIN32) || defined(_WIN64)
+#define timegm _mkgmtime
+#endif
+
 void Normalize(struct tm *tmout)
 {
 	//Normalize format
-	time_t ts = mktime (tmout);
+	time_t ts = timegm (tmout);
 	PlatformGmtime(ts, tmout);
 }
 
@@ -457,7 +461,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	}
 	if(timezoneOffsetMin != NULL)
 		*timezoneOffsetMin = (tzh*60) + tzm;
-	
+
 	//Format 1 full time
 	if(btl >= 8 && (MatchPattern(baseTime, "dd:dd:f") || MatchPattern(baseTime, "dd:dd:dd")))
 	{
@@ -568,8 +572,6 @@ bool ParseIso8601Datetime(const char *str, struct tm *tmout, int *timezoneOffset
 			return false; //Input too long
 		strncpy(timeStr, tChar+1, timeLen);
 		timeStr[timeLen] = '\0';
-
-		//printf("split %s, %s\n", dateStr, timeStr);
 
 		ok = ParseIso8601Date(dateStr, tmout);
 		if(!ok) return false;
