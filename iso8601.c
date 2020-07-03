@@ -80,7 +80,7 @@ void PlatformGmtime(time_t ts, struct tm *tmout)
 		gmtime_r(&ts, tmout);
 	#else
 		#if defined(_WIN32) || defined(_WIN64)
-		gmtime_s(&ts, tmout);
+		gmtime_s(tmout, &ts);
 		#else
 		#warning "Code is not thread safe because no safe alternative to gmtime was found"
 		struct tm *tmp = gmtime(&ts);
