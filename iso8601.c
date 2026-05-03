@@ -76,7 +76,7 @@ bool MatchPattern(const char *str, const char *pattern)
 
 void PlatformGmtime(time_t ts, struct tm *tmout)
 {
-	#ifdef __unix
+	#ifdef __unix__
 		gmtime_r(&ts, tmout);
 	#else
 		#if defined(_WIN32) || defined(_WIN64)
@@ -345,8 +345,6 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 
 			*tmout = sow;
 			tmout->tm_mday += (w-1)*7;
-			if(d <= 0 || d > 7)
-				return false;
 			Normalize(tmout);
 			return true;
 		}
@@ -364,8 +362,6 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 
 			*tmout = sow;
 			tmout->tm_mday += (w-1)*7;
-			if(d <= 0 || d > 7)
-				return false;
 			Normalize(tmout);
 			return true;
 		}
@@ -384,7 +380,7 @@ bool ParseIso8601Timezone(const char *str, int *h, int *m)
 		return true;
 
 	//Format 2
-	char sign;
+	char sign = 0;
 	int hv=0, mv=0;
 	int ret = sscanf(str, "%c%2d%2d", &sign, h, m);
 	if(ret < 1)
@@ -393,21 +389,29 @@ bool ParseIso8601Timezone(const char *str, int *h, int *m)
 		*m = 0;
 
 	//Format 3
-	int ret2 = sscanf(str, "%c%2d:%2d", &sign, &hv, &mv);
+	char sign2 = 0;
+	int ret2 = sscanf(str, "%c%2d:%2d", &sign2, &hv, &mv);
 	if(ret2 > ret)
 	{
+		sign = sign2;
 		*h = hv;
-		if(ret2 >= 2)
-			*m = mv;
+		*m = (ret2 >= 3) ? mv : 0;
 	}
 
-	if(ret == 0 && ret2 == 0)
+	if(ret < 1 && ret2 < 1)
+		return false;
+
+	if(sign != '+' && sign != '-')
+		return false;
+
+	if(*h > 14 || *m > 59)
 		return false;
 
 	if(sign == '-')
+	{
 		*h = -(*h);
-	if(*h < 0)
 		*m = -(*m);
+	}
 	return true;
 }
 
@@ -499,7 +503,7 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 	if(btl >= 6 && (MatchPattern(baseTime, "ddddf") || MatchPattern(baseTime, "dddddd")))
 	{
 		h = 0; m = 0; s = 0.0f;
-		int ret4 = sscanf(baseTime, "%2d%2d%f%s", &h, &m, &s, excess);
+		int ret4 = sscanf(baseTime, "%2d%2d%f%100s", &h, &m, &s, excess);
 		if(ret4 == 3)
 		{
 			tmout->tm_hour = h;
