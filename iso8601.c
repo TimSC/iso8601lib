@@ -134,6 +134,35 @@ void CalcStartOfFirstWeek(int y, struct tm *sow)
 	Normalize(sow);
 }
 
+static bool IsLeapYear(int y)
+{
+	return (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0));
+}
+
+static int DaysInMonth(int y, int m)
+{
+	static const int days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	if(m < 1 || m > 12)
+		return 0;
+	return days[m-1] + (m == 2 && IsLeapYear(y));
+}
+
+static int WeeksInIsoYear(int y)
+{
+	struct tm start, next;
+	CalcStartOfFirstWeek(y, &start);
+	CalcStartOfFirstWeek(y + 1, &next);
+	return (int)((timegm(&next) - timegm(&start)) / (7 * 24 * 60 * 60));
+}
+
+static bool ValidTime(double h, double m, double s)
+{
+	if(!isfinite(h) || !isfinite(m) || !isfinite(s) ||
+	   h < 0 || h > 24 || m < 0 || m >= 60 || s < 0 || s >= 60)
+		return false;
+	return h < 24 || (h <= 24 && !(m > 0 || s > 0));
+}
+
 bool ParseIso8601Date(const char *str, struct tm *tmout)
 {
 	int y=1900,M=1,w=1,d=1;
@@ -146,6 +175,8 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		int ret4 = sscanf(str, "%4d%2d%2d", &y, &M, &d);
 		if(ret4 == 3)
 		{
+			if(M < 1 || M > 12 || d < 1 || d > DaysInMonth(y, M))
+				return false;
 			tmout->tm_year = y - 1900;
 			tmout->tm_mon = M - 1;
 			tmout->tm_mday = d;
@@ -160,6 +191,8 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		int ret = sscanf(str, "%4d-%2d-%2d", &y, &M, &d);
 		if(ret == 3)
 		{
+			if(M < 1 || M > 12 || d < 1 || d > DaysInMonth(y, M))
+				return false;
 			tmout->tm_year = y - 1900;
 			tmout->tm_mon = M - 1;
 			tmout->tm_mday = d;
@@ -175,6 +208,8 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		int ret5 = sscanf(str, "%4d-%2d", &y, &M);
 		if(ret5 == 2)
 		{
+			if(M < 1 || M > 12)
+				return false;
 			tmout->tm_year = y - 1900;
 			tmout->tm_mon = M - 1;
 			tmout->tm_mday = 1;
@@ -272,7 +307,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		{
 			tmout->tm_year = y - 1900;
 			tmout->tm_mday = d;
-			if(d <= 0 || d > 366)
+			if(d <= 0 || d > (IsLeapYear(y) ? 366 : 365))
 				return false;
 			Normalize(tmout);
 			return true;
@@ -288,7 +323,7 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		{
 			tmout->tm_year = y - 1900;
 			tmout->tm_mday = d;
-			if(d <= 0 || d > 366)
+			if(d <= 0 || d > (IsLeapYear(y) ? 366 : 365))
 				return false;
 			Normalize(tmout);
 			return true;
@@ -303,12 +338,12 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		if(ret4 == 3)
 		{
 			struct tm sow;
+			if(w < 1 || w > WeeksInIsoYear(y) || d < 1 || d > 7)
+				return false;
 			CalcStartOfFirstWeek(y, &sow);
 
 			*tmout = sow;
 			tmout->tm_mday += (d-1) + (w-1)*7;
-			if(d <= 0 || d > 7)
-				return false;
 			Normalize(tmout);
 			return true;
 		}
@@ -322,12 +357,12 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		if(ret4 == 3)
 		{
 			struct tm sow;
+			if(w < 1 || w > WeeksInIsoYear(y) || d < 1 || d > 7)
+				return false;
 			CalcStartOfFirstWeek(y, &sow);
 
 			*tmout = sow;
 			tmout->tm_mday += (d-1) + (w-1)*7;
-			if(d <= 0 || d > 7)
-				return false;
 			Normalize(tmout);
 			return true;
 		}
@@ -341,6 +376,8 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		if(ret4 == 2)
 		{
 			struct tm sow;
+			if(w < 1 || w > WeeksInIsoYear(y))
+				return false;
 			CalcStartOfFirstWeek(y, &sow);
 
 			*tmout = sow;
@@ -358,6 +395,8 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		if(ret4 == 2)
 		{
 			struct tm sow;
+			if(w < 1 || w > WeeksInIsoYear(y))
+				return false;
 			CalcStartOfFirstWeek(y, &sow);
 
 			*tmout = sow;
@@ -372,46 +411,39 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 
 bool ParseIso8601Timezone(const char *str, int *h, int *m)
 {
-	*h = 0;
-	*m = 0;
-
-	//Format 1 zulu time
+	size_t len = strlen(str);
+	char sign;
+	int hh, mm = 0;
 	if(strcmp(str, "Z") == 0)
-		return true;
-
-	//Format 2
-	char sign = 0;
-	int hv=0, mv=0;
-	int ret = sscanf(str, "%c%2d%2d", &sign, h, m);
-	if(ret < 1)
+	{
 		*h = 0;
-	if(ret < 2)
 		*m = 0;
-
-	//Format 3
-	char sign2 = 0;
-	int ret2 = sscanf(str, "%c%2d:%2d", &sign2, &hv, &mv);
-	if(ret2 > ret)
-	{
-		sign = sign2;
-		*h = hv;
-		*m = (ret2 >= 3) ? mv : 0;
+		return true;
 	}
-
-	if(ret < 1 && ret2 < 1)
+	if(len < 3 || (str[0] != '+' && str[0] != '-'))
 		return false;
-
-	if(sign != '+' && sign != '-')
+	sign = str[0];
+	if(str[1] < '0' || str[1] > '9' || str[2] < '0' || str[2] > '9')
 		return false;
-
-	if(*h > 14 || *m > 59)
-		return false;
-
-	if(sign == '-')
+	hh = (str[1] - '0') * 10 + str[2] - '0';
+	if(len == 6 && str[3] == ':')
 	{
-		*h = -(*h);
-		*m = -(*m);
+		if(str[4] < '0' || str[4] > '9' || str[5] < '0' || str[5] > '9')
+			return false;
+		mm = (str[4] - '0') * 10 + str[5] - '0';
 	}
+	else if(len == 5)
+	{
+		if(str[3] < '0' || str[3] > '9' || str[4] < '0' || str[4] > '9')
+			return false;
+		mm = (str[3] - '0') * 10 + str[4] - '0';
+	}
+	else if(len != 3)
+		return false;
+	if(hh > 14 || mm > 59)
+		return false;
+	*h = sign == '-' ? -hh : hh;
+	*m = sign == '-' ? -mm : mm;
 	return true;
 }
 
@@ -472,6 +504,8 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int ret = sscanf(baseTime, "%2d:%2d:%f%100s", &h, &m, &s, excess);
 		if(ret == 3)
 		{
+			if(!ValidTime((double)h, (double)m, (double)s))
+				return false;
 			tmout->tm_hour = h;
 			tmout->tm_min = m;
 			tmout->tm_sec = round(s);
@@ -488,11 +522,11 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int ret2 = sscanf(baseTime, "%2d:%f%100s", &h, &mf, excess);
 		if(ret2 == 2)
 		{
+			if(!ValidTime((double)h, (double)mf, 0))
+				return false;
 			tmout->tm_hour = h;
 			tmout->tm_min = mf;
 			tmout->tm_sec = round((mf - (int)(mf)) * 60.0);
-			if(h == 24 && mf != 0)
-				return false; //Invalid time
 			//ApplyTimezone(tmout, tzh, tzm);
 			Normalize(tmout);
 			return true;
@@ -506,6 +540,8 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int ret4 = sscanf(baseTime, "%2d%2d%f%100s", &h, &m, &s, excess);
 		if(ret4 == 3)
 		{
+			if(!ValidTime((double)h, (double)m, (double)s))
+				return false;
 			tmout->tm_hour = h;
 			tmout->tm_min = m;
 			tmout->tm_sec = round(s);
@@ -522,6 +558,8 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int ret5 = sscanf(baseTime, "%2d%f%s", &h, &mf, excess);
 		if(ret5 == 2)
 		{
+			if(!ValidTime((double)h, (double)mf, 0))
+				return false;
 			tmout->tm_hour = h;
 			tmout->tm_min = (int)(mf);
 			tmout->tm_sec = round((mf - tmout->tm_min)*60.0);
@@ -538,6 +576,8 @@ bool ParseIso8601Time(const char *str, struct tm *tmout, int *timezoneOffsetMin)
 		int ret3 = sscanf(baseTime, "%f%100s", &hf, excess);
 		if(ret3 == 1)
 		{
+			if(!ValidTime((double)hf, 0, 0))
+				return false;
 			tmout->tm_hour = (int)(hf);
 			float mins = (hf - (float)tmout->tm_hour) * 60.0f;
 			tmout->tm_min = (int)mins;

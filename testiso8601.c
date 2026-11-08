@@ -109,6 +109,10 @@ struct Iso8601Test **Iso8601TestCases()
 	Iso8601TestFactory("2010-02-18T16.2233344445555", 1266509604.0040004, tests, &cursor, numTests-1);
 
 	Iso8601TestFactory("2010-02-18T16.22333444455555666666", 1266509604.0040004, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2024-02-29", 1709164800, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2020-366", 1609372800, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2020-W53-7", 1609632000, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+14:01", 1672523940, tests, &cursor, numTests-1);
 
 	//Bad ISO8601 strings
 	Iso8601TestFactory("200905", -1, tests, &cursor, numTests-1);
@@ -158,6 +162,31 @@ struct Iso8601Test **Iso8601TestCases()
 	Iso8601TestFactory("2010-02-18T16:23.33.600", -1, tests, &cursor, numTests-1);
 
 	Iso8601TestFactory("2010-02-18T16,25:23:48,444", -1, tests, &cursor, numTests-1);
+
+	Iso8601TestFactory("2023-02-30", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("20230230", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-13-01", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-00-01", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-13", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-00", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-366", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023366", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-W53-1", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023W537", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-W53", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-W00-1", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-W00", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:60", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T1260", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00:60", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T120060", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T25:00", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T25", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T24:00:01", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T24:01", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T24.5", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+0100junk", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+01junk", -1, tests, &cursor, numTests-1);
 
 	return tests;
 }
