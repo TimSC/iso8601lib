@@ -10,45 +10,47 @@
 #define timegm _mkgmtime
 #endif
 
-enum TestMode
-{
-	MODE_BOTH, //Same result expected from permissive and strict parsing
-	MODE_PERMISSIVE,
-	MODE_STRICT
-};
+//Expected result for input that should fail to parse
+#define REJECT NAN
 
+//Every test is run with both permissive and strict parsing
 struct Iso8601Test
 {
 	char *inputstr;
-	double posixTs;
-	enum TestMode mode;
+	double permissiveTs; //Expected POSIX time, or REJECT
+	double strictTs;
 };
 
-void Iso8601TestFactoryMode(const char *inputstr, double posixTs, enum TestMode mode, struct Iso8601Test **tests, int *cursor, int maxtests)
+void Iso8601TestFactoryModes(const char *inputstr, double permissiveTs, double strictTs, struct Iso8601Test **tests, int *cursor, int maxtests)
 {
 	struct Iso8601Test *out = (struct Iso8601Test *)malloc(sizeof(struct Iso8601Test));
 	int sl = strlen(inputstr);
 	out->inputstr = (char *)malloc(sl+1);
 	strncpy(out->inputstr, inputstr, sl+1);
-	out->posixTs = posixTs;
-	out->mode = mode;
+	out->permissiveTs = permissiveTs;
+	out->strictTs = strictTs;
 	if(*cursor < maxtests)
 	{
 		tests[*cursor] = out;
 		(*cursor) ++;
 	}
+	else
+	{
+		printf("Too many test cases, increase numTests\n");
+		exit(1);
+	}
 }
 
+//Same result expected from permissive and strict parsing
 void Iso8601TestFactory(const char *inputstr, double posixTs, struct Iso8601Test **tests, int *cursor, int maxtests)
 {
-	Iso8601TestFactoryMode(inputstr, posixTs, MODE_BOTH, tests, cursor, maxtests);
+	Iso8601TestFactoryModes(inputstr, posixTs, posixTs, tests, cursor, maxtests);
 }
 
-//Out of range input: rejected by strict parsing, normalized by permissive parsing
+//Out of range input: normalized by permissive parsing, rejected by strict parsing
 void OutOfRangeTest(const char *inputstr, double normalizedPosixTs, struct Iso8601Test **tests, int *cursor, int maxtests)
 {
-	Iso8601TestFactoryMode(inputstr, -1, MODE_STRICT, tests, cursor, maxtests);
-	Iso8601TestFactoryMode(inputstr, normalizedPosixTs, MODE_PERMISSIVE, tests, cursor, maxtests);
+	Iso8601TestFactoryModes(inputstr, normalizedPosixTs, REJECT, tests, cursor, maxtests);
 }
 
 struct Iso8601Test **Iso8601TestCases()
@@ -144,57 +146,81 @@ struct Iso8601Test **Iso8601TestCases()
 	Iso8601TestFactory("2017-01-01T00:59:60+01:00", 1483228800, tests, &cursor, numTests-1);
 	Iso8601TestFactory("2016-12-31T18:59:60-05:00", 1483228800, tests, &cursor, numTests-1);
 
+	//Boundary values, valid in strict mode
+	Iso8601TestFactory("2023-12-31", 1703980800, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-365", 1703980800, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2000-02-29", 951782400, tests, &cursor, numTests-1); //Divisible by 400, leap year
+	Iso8601TestFactory("2023-W52-7", 1703980800, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2026-W53-7", 1798934400, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T00:00:00", 1672531200, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T23:59:59", 1672617599, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+14:00", 1672524000, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00-14:00", 1672624800, tests, &cursor, numTests-1);
+	//Fractional seconds are rounded, so this rolls over to the next minute
+	Iso8601TestFactory("2023-01-01T12:00:59.6", 1672574460, tests, &cursor, numTests-1);
+
+	//Negative POSIX times
+	Iso8601TestFactory("1969-12-31T23:59:59Z", -1, tests, &cursor, numTests-1);
+	//Negative years (proleptic Gregorian, astronomical year numbering)
+	Iso8601TestFactory("-0001", -62198755200LL, tests, &cursor, numTests-1);
+	Iso8601TestFactory("-0004", -62293449600LL, tests, &cursor, numTests-1); //Leap year
+	Iso8601TestFactory("-0400", -74790000000LL, tests, &cursor, numTests-1); //400-year leap year
+	Iso8601TestFactory("-0000", -62167219200LL, tests, &cursor, numTests-1); //Year 0
+
 	//Bad ISO8601 strings
-	Iso8601TestFactory("200905", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("200905", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-M511", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-M511", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009M511", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009M511", REJECT, tests, &cursor, numTests-1);
 
- 	Iso8601TestFactory("2009-05-19T14a39r", -1, tests, &cursor, numTests-1);
+ 	Iso8601TestFactory("2009-05-19T14a39r", REJECT, tests, &cursor, numTests-1);
  
-	Iso8601TestFactory("2009-05-19T14:3924", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19T14:3924", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-0519", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-0519", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-1914:39", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-1914:39", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 14:", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 14:", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19r14:39", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19r14:39", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 14a39a22", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 14a39a22", REJECT, tests, &cursor, numTests-1);
  
-	Iso8601TestFactory("200912-01", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("200912-01", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 14a39a22", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 14a39a22", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 14:39:22+06a00", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 14:39:22+06a00", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 146922.500", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 146922.500", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2010-02-18T16.5:23.35:48", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2010-02-18T16.5:23.35:48", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2010-02-18T16:23.35:48", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2010-02-18T16:23.35:48", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2010-02-18T16:23.35:48.45", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2010-02-18T16:23.35:48.45", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2009-05-19 14.5.44", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2009-05-19 14.5.44", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2010-02-18T16:23.33.600", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2010-02-18T16:23.33.600", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2010-02-18T16,25:23:48,444", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2010-02-18T16,25:23:48,444", REJECT, tests, &cursor, numTests-1);
 
-	Iso8601TestFactory("2023-01-01T12:00+0100junk", -1, tests, &cursor, numTests-1);
-	Iso8601TestFactory("2023-01-01T12:00+01junk", -1, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+0100junk", REJECT, tests, &cursor, numTests-1);
+	Iso8601TestFactory("2023-01-01T12:00+01junk", REJECT, tests, &cursor, numTests-1);
 
 	//Out of range values: rejected by strict parsing, normalized by permissive parsing
 	OutOfRangeTest("2009367", 1262390400, tests, &cursor, numTests-1);
 	OutOfRangeTest("2009-000", 1230681600, tests, &cursor, numTests-1);
 	OutOfRangeTest("2007-04-05T24:50", 1175820600, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-02-30", 1677715200, tests, &cursor, numTests-1);
+	OutOfRangeTest("2023-04-31", 1682899200, tests, &cursor, numTests-1); //30 day month
+	OutOfRangeTest("1900-02-29", -2203891200LL, tests, &cursor, numTests-1); //Divisible by 100, not a leap year
+	OutOfRangeTest("2100-02-29", 4107542400LL, tests, &cursor, numTests-1);
 	OutOfRangeTest("20230230", 1677715200, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-13-01", 1704067200, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-00-01", 1669852800, tests, &cursor, numTests-1);
@@ -207,6 +233,8 @@ struct Iso8601Test **Iso8601TestCases()
 	OutOfRangeTest("2023-W53", 1704067200, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-W00-1", 1672012800, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-W00", 1672012800, tests, &cursor, numTests-1);
+	OutOfRangeTest("2023-W01-0", 1672531200, tests, &cursor, numTests-1);
+	OutOfRangeTest("2023-W01-8", 1673222400, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-01-01T12:60", 1672578000, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-01-01T1260", 1672578000, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-01-01T12:00:60", 1672574460, tests, &cursor, numTests-1);
@@ -218,7 +246,9 @@ struct Iso8601Test **Iso8601TestCases()
 	OutOfRangeTest("2023-01-01T24.5", 1672619400, tests, &cursor, numTests-1);
 	//Timezone offsets
 	OutOfRangeTest("2023-01-01T12:00+15:00", 1672520400, tests, &cursor, numTests-1);
+	OutOfRangeTest("2023-01-01T12:00-15:00", 1672628400, tests, &cursor, numTests-1);
 	OutOfRangeTest("2023-01-01T12:00+01:60", 1672567200, tests, &cursor, numTests-1);
+	OutOfRangeTest("2023-01-01T12:00+0160", 1672567200, tests, &cursor, numTests-1);
 	//Second 60 outside the last minute of a UTC day is not a leap second
 	OutOfRangeTest("2016-12-31T23:58:60Z", 1483228740, tests, &cursor, numTests-1);
 	OutOfRangeTest("2016-12-31T23:59:60+01:00", 1483225200, tests, &cursor, numTests-1);
@@ -227,9 +257,8 @@ struct Iso8601Test **Iso8601TestCases()
 	return tests;
 }
 
-//Negative years give negative POSIX times, which the table above treats as
-//"expect failure", so they are checked separately here.
-//Expected values are proleptic Gregorian with astronomical year numbering.
+//Negative years: extra checks on the tm fields, and on calling
+//ParseIso8601Date directly. The POSIX times are also in the main table.
 int CheckNegativeYearMode(const char *inputstr, int64_t posixTs, int wday, bool strict)
 {
 	int errors = 0;
@@ -277,11 +306,49 @@ int CheckNegativeYear(const char *inputstr, int64_t posixTs, int wday)
 		+ CheckNegativeYearMode(inputstr, posixTs, wday, true);
 }
 
-//Tests in MODE_BOTH run twice: permissive first, then strict
-#define NEXT_TEST() do { \
-		if(mode == MODE_BOTH && pass == 0) pass = 1; \
-		else { pass = 0; cursor ++; } \
-	} while(0)
+//Returns the number of errors
+int RunTest(const struct Iso8601Test *test, int index, bool strict)
+{
+	double expected = strict ? test->strictTs : test->permissiveTs;
+	struct tm dt;
+	int timezoneMin = -1;
+
+	printf("Test case %d (%s): %s\n", index, strict ? "strict" : "permissive", test->inputstr);
+	bool ok = strict ? ParseIso8601DatetimeStrict(test->inputstr, &dt, &timezoneMin)
+		: ParseIso8601Datetime(test->inputstr, &dt, &timezoneMin);
+	if(!ok)
+	{
+		if(isnan(expected))
+		{
+			printf("Parse fail as expected\n");
+			return 0;
+		}
+		printf("Parse FAIL as NOT EXPECTED\n");
+		return 1;
+	}
+	if(isnan(expected))
+	{
+		printf("Parse should have FAILED\n");
+		return 1;
+	}
+
+	printf("%d,%d,%d,%d,%d,%d,%d\n", 1900+dt.tm_year, 1+dt.tm_mon, dt.tm_mday,
+		dt.tm_hour, dt.tm_min, dt.tm_sec, timezoneMin);
+
+	//Get UTC time
+	TmToUtc(&dt, timezoneMin);
+	time_t ts = timegm(&dt);
+
+	printf("UTC %s", ctime(&ts));
+	printf("result %lld = correct %lld", (long long)ts, (long long)round(expected)); //UTC unix time-stamp
+	if(fabs((double)ts - round(expected)) > 1e-6)
+	{
+		printf(" FAIL\n");
+		return 1;
+	}
+	printf("\n");
+	return 0;
+}
 
 int main()
 {
@@ -302,55 +369,11 @@ int main()
 	errors += CheckNegativeYear("-0400", -74790000000LL, 6); //400-year leap year
 	errors += CheckNegativeYear("-0000", -62167219200LL, 6); //Year 0, not negative
 
-	int pass = 0;
 	while(tests[cursor] != NULL)
 	{
-		enum TestMode mode = tests[cursor]->mode;
-		bool strict = (mode == MODE_STRICT) || (mode == MODE_BOTH && pass == 1);
-		printf("Test case %d (%s): %s\n", cursor, strict ? "strict" : "permissive", tests[cursor]->inputstr);
-		struct tm dt;
-		int timezoneMin = -1;
-		bool ok = strict ? ParseIso8601DatetimeStrict(tests[cursor]->inputstr, &dt, &timezoneMin)
-			: ParseIso8601Datetime(tests[cursor]->inputstr, &dt, &timezoneMin);
-		if(!ok)
-		{
-			if(tests[cursor]->posixTs < 0.0)
-				printf("Parse fail as expected\n");
-			else
-			{
-				printf("Parse FAIL as NOT EXPECTED\n");
-				errors++;
-			}
-			NEXT_TEST();
-			continue;
-		}
-		else
-		{
-			if(tests[cursor]->posixTs < 0.0)
-			{
-				printf("Parse should have FAILED\n");
-				errors ++;
-				cursor ++;
-				continue;
-			}
-		}
-
-		printf("%d,%d,%d,%d,%d,%d,%d\n", 1900+dt.tm_year, 1+dt.tm_mon, dt.tm_mday, \
-			dt.tm_hour, dt.tm_min, dt.tm_sec, timezoneMin);
-
-		//Get UTC time
-		TmToUtc(&dt, timezoneMin);
-		time_t ts = timegm (&dt);
-
-		printf("UTC %s", ctime(&ts));
-		printf("result %ld = correct %ld", (int64_t)ts, (int64_t)round(tests[cursor]->posixTs)); //UTC unix time-stamp
-		if(fabs((int64_t)ts - round(tests[cursor]->posixTs))>1e-6)
-		{
-			printf(" FAIL");
-			errors ++;
-		}
-		printf("\n");
-		NEXT_TEST();
+		errors += RunTest(tests[cursor], cursor, false);
+		errors += RunTest(tests[cursor], cursor, true);
+		cursor ++;
 	}
 	printf("Errors %d\n", errors);
 	return errors != 0;
