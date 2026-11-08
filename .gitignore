@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# Fuzzing
+fuzz/fuzz_iso8601
+fuzz/corpus/
+fuzz/crash-*
+fuzz/leak-*
+fuzz/timeout-*
+fuzz/oom-*
