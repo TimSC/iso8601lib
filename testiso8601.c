@@ -197,6 +197,13 @@ int main()
 	
 	int errors = 0;
 	int cursor = 0;
+	struct tm negativeYear;
+	if(!ParseIso8601Date("-0001", &negativeYear) ||
+	   negativeYear.tm_year != -1901 || negativeYear.tm_mon != 0 ||
+	   negativeYear.tm_mday != 1 || negativeYear.tm_wday != 5 ||
+	   negativeYear.tm_yday != 0)
+		errors++;
+
 	while(tests[cursor] != NULL)
 	{
 		printf("Test case %d: %s\n", cursor, tests[cursor]->inputstr);

@@ -155,6 +155,20 @@ static int WeeksInIsoYear(int y)
 	return (int)((timegm(&next) - timegm(&start)) / (7 * 24 * 60 * 60));
 }
 
+static int Weekday(int y, int m, int d)
+{
+	int era;
+	int days;
+	unsigned yoe;
+	unsigned doy;
+	y -= m < 3;
+	era = (y >= 0 ? y : y - 399) / 400;
+	yoe = (unsigned)(y - era * 400);
+	doy = (unsigned)((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1);
+	days = era * 146097 + (int)(yoe * 365 + yoe / 4 - yoe / 100 + doy) - 719468;
+	return ((days + 4) % 7 + 7) % 7;
+}
+
 static bool ValidTime(double h, double m, double s)
 {
 	if(!isfinite(h) || !isfinite(m) || !isfinite(s) ||
@@ -240,10 +254,26 @@ bool ParseIso8601Date(const char *str, struct tm *tmout)
 		int ret2b = sscanf(str, "%5d", &y);
 		if(ret2b == 1)
 		{
-			tmout->tm_year = - y - 1900;
-			tmout->tm_mon = 0;
-			tmout->tm_mday = 1;
-			Normalize(tmout);
+			if(y < 0)
+			{
+				memset(tmout, 0, sizeof(*tmout));
+				tmout->tm_year = y - 1900;
+				tmout->tm_mon = 0;
+				tmout->tm_mday = 1;
+				tmout->tm_hour = 0;
+				tmout->tm_min = 0;
+				tmout->tm_sec = 0;
+				tmout->tm_wday = Weekday(y, 1, 1);
+				tmout->tm_yday = 0;
+				tmout->tm_isdst = 0;
+			}
+			else
+			{
+				tmout->tm_year = y - 1900;
+				tmout->tm_mon = 0;
+				tmout->tm_mday = 1;
+				Normalize(tmout);
+			}
 			return true;
 		}
 	}
